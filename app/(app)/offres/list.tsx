@@ -11,6 +11,8 @@ import type { OffreSummary, OffersSearch, OffersSort } from "@/lib/db/offres";
 import { CONTRACT_LABELS, CONTRACT_ORDER, type ContractCategory } from "@/lib/contracts";
 import { SOURCES_META } from "@/lib/sources-meta";
 import { previewExcerpt } from "@/lib/offres/preview";
+import { DISTANCE_RADII, distanceLabel, isApproximate, radiusLabel } from "@/lib/distance/format";
+import { DistanceHomePicker, type HomeCommune } from "@/components/app/distance-home";
 
 const sourceLabels = Object.fromEntries(SOURCES_META.map((source) => [source.id, source.label]));
 const numberFormat = new Intl.NumberFormat("fr-FR");
@@ -31,10 +33,13 @@ export function OffresList({
   initialResult,
   initialVieOnly = false,
   initialMinScore = 0,
+  homeSuggestion = null,
 }: {
   initialResult: OffersSearch;
   initialVieOnly?: boolean;
   initialMinScore?: number;
+  /** Commune proposée d'après le lieu du profil, tant qu'aucune ville de référence n'est choisie. */
+  homeSuggestion?: HomeCommune | null;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -46,6 +51,9 @@ export function OffresList({
   const scoreThreshold = initialMinScore || DEFAULT_MIN_SCORE;
   const [minScore, setMinScore] = useState(initialMinScore > 0);
   const [sortBy, setSortBy] = useState<OffersSort>("smart");
+  // Distance : rayon en km (0 = dans la commune), null = toutes distances.
+  const [radius, setRadius] = useState<number | null>(null);
+  const [includeUnlocated, setIncludeUnlocated] = useState(false);
   const [result, setResult] = useState(initialResult);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -58,8 +66,10 @@ export function OffresList({
   const initialVieRef = useRef(initialVieOnly);
   const contractKey = [...contracts].sort().join(",");
   const vieFilter = contracts.has("vie");
-  const hasFilters = !!query || !!source || !!country || contracts.size > 0 || minScore;
-  const activeFilterCount = Number(!!source) + Number(!!country) + contracts.size + Number(minScore);
+  const hasFilters = !!query || !!source || !!country || contracts.size > 0 || minScore || radius !== null;
+  const activeFilterCount = Number(!!source) + Number(!!country) + contracts.size + Number(minScore) + Number(radius !== null);
+  const distanceFacets = result.facets.distance;
+  const home = distanceFacets.home;
   const { countries, sources, contractCounts } = result.facets;
   const shown = result.offers;
   const remaining = Math.max(0, result.total - shown.length);
@@ -111,6 +121,8 @@ export function OffresList({
     if (country) params.set("country", country);
     if (contractKey) params.set("contracts", contractKey);
     if (minScore) params.set("minScore", String(scoreThreshold));
+    if (radius !== null) params.set("radius", String(radius));
+    if (radius !== null && includeUnlocated) params.set("unlocated", "1");
     setLoading(true);
     setError(false);
     const timer = window.setTimeout(async () => {
@@ -131,10 +143,28 @@ export function OffresList({
       }
     }, page > 1 ? 0 : query ? 250 : 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [query, source, country, contractKey, minScore, scoreThreshold, sortBy, page, refreshKey]);
+  }, [query, source, country, contractKey, minScore, scoreThreshold, sortBy, radius, includeUnlocated, page, refreshKey]);
 
   function reset() {
-    setQuery(""); setSource(""); setCountry(""); setContracts(new Set()); setMinScore(false); setSelectedId(null); setFiltersExpanded(false); setPage(1);
+    setQuery(""); setSource(""); setCountry(""); setContracts(new Set()); setMinScore(false); setRadius(null); setIncludeUnlocated(false); setSelectedId(null); setFiltersExpanded(false); setPage(1);
+  }
+
+  useEffect(() => {
+    if (home) return;
+    if (radius !== null) setRadius(null);
+    if (includeUnlocated) setIncludeUnlocated(false);
+    if (sortBy === "distance") setSortBy("smart");
+  }, [home, radius, includeUnlocated, sortBy]);
+
+  /** Nouvelle ville de référence (ou aucune) : les distances changent, on redemande la liste. */
+  function onHomeSaved(next: HomeCommune | null) {
+    if (!next) {
+      setRadius(null);
+      setIncludeUnlocated(false);
+      if (sortBy === "distance") setSortBy("smart");
+    }
+    setPage(1);
+    setRefreshKey((key) => key + 1);
   }
 
   function toggleContract(contract: ContractCategory) {
@@ -163,6 +193,7 @@ export function OffresList({
               <option value="newest">Plus récentes</option>
               <option value="oldest">Plus anciennes</option>
               <option value="score">Meilleur score</option>
+              <option value="distance" disabled={!home}>{home ? "Plus proches" : "Plus proches (ville à définir)"}</option>
             </select>
           </label>
         </div>
@@ -191,6 +222,33 @@ export function OffresList({
             <option value="">Tous les pays</option>
             {countries.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
+        </div>
+
+        <div role="group" aria-label="Distance" className="mt-3 flex flex-wrap items-center gap-2">
+          <DistanceHomePicker home={home} suggestion={home ? null : homeSuggestion} active={radius !== null || sortBy === "distance"} onSaved={onHomeSaved} />
+          <select
+            value={radius === null ? "" : String(radius)}
+            disabled={!home}
+            onChange={(event) => { setRadius(event.target.value === "" ? null : Number(event.target.value)); setPage(1); }}
+            aria-label="Filtrer par distance"
+            title={home ? undefined : "Définissez d'abord votre ville"}
+            className="h-9 max-w-full rounded-md border border-border bg-bg px-3 text-small text-text focus:border-accent focus:outline-none disabled:opacity-50"
+          >
+            <option value="">Toutes distances</option>
+            {DISTANCE_RADII.map((item) => (
+              <option key={item} value={item}>{radiusLabel(item)}{home ? ` · ${numberFormat.format(distanceFacets.counts[String(item)] ?? 0)}` : ""}</option>
+            ))}
+          </select>
+          {radius !== null && distanceFacets.unlocated > 0 && (
+            <span className="text-caption text-textSecondary">
+              {includeUnlocated
+                ? `Dont ${numberFormat.format(distanceFacets.unlocated)} offre${distanceFacets.unlocated > 1 ? "s" : ""} en France sans ville précise.`
+                : `${numberFormat.format(distanceFacets.unlocated)} offre${distanceFacets.unlocated > 1 ? "s" : ""} en France sans ville précise (télétravail, lieu non indiqué) non comptée${distanceFacets.unlocated > 1 ? "s" : ""}.`}{" "}
+              <button type="button" onClick={() => { setIncludeUnlocated(!includeUnlocated); setPage(1); }} className="font-semibold text-accent hover:underline">
+                {includeUnlocated ? "Les retirer" : "Les inclure"}
+              </button>
+            </span>
+          )}
           {hasFilters && <button type="button" onClick={reset} className="inline-flex h-9 items-center gap-1.5 px-2 text-small font-semibold text-accent hover:underline"><RotateCcw className="h-3.5 w-3.5" /> Effacer les filtres</button>}
         </div>
         </div>
@@ -214,7 +272,7 @@ export function OffresList({
           {hasFilters && <button type="button" onClick={reset} className="mt-5 text-small font-semibold text-accent hover:underline">Voir toutes les offres</button>}
         </div>
       ) : (
-        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
+        <div className={cn("grid items-start gap-5 transition-opacity xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]", loading && "opacity-60")}>
           <div className="min-w-0">
             <div className="glass-panel overflow-hidden">
               {shown.map((offer) => <OfferRow key={offer.id} offer={offer} selected={selected?.id === offer.id} onSelect={() => setSelectedId(offer.id)} />)}
@@ -232,6 +290,13 @@ export function OffresList({
       )}
     </div>
   );
+}
+
+/** Lieu reconnu par JobScout, montré s'il est approximatif ou absent du texte de l'offre (sinon : null). */
+function understoodPlace(offer: OffreSummary): string | null {
+  if (!offer.geo_label || offer.distance_km === null) return null;
+  if (isApproximate(offer.geo_precision)) return `${offer.geo_label} ?`;
+  return offer.location ? null : offer.geo_label;
 }
 
 function OfferRow({ offer, selected, onSelect }: { offer: OffreSummary; selected: boolean; onSelect: () => void }) {
@@ -257,7 +322,11 @@ function OfferRowContent({ offer }: { offer: OffreSummary }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block font-medium leading-snug group-hover:text-accent">{offer.title}</span>
-        <span className="mt-1 block text-small text-textSecondary">{offer.company || "Entreprise non précisée"} · {offer.location || offer.country || "Lieu non précisé"}</span>
+        <span className="mt-1 block text-small text-textSecondary">
+          {offer.company || "Entreprise non précisée"} · {offer.location || offer.country || "Lieu non précisé"}
+          {understoodPlace(offer) && <span> · {understoodPlace(offer)}</span>}
+          {distanceLabel(offer) && <span className="whitespace-nowrap font-semibold text-text"> · {distanceLabel(offer)}</span>}
+        </span>
         <span className="mt-3 flex flex-wrap items-center gap-1.5">
           {offer.posted_at && <span className="mr-1 text-caption text-textSecondary">{formatRelativeDate(offer.posted_at)}</span>}
           <Badge>{sourceLabels[offer.source] ?? offer.source}</Badge>
@@ -291,7 +360,16 @@ function OfferPreview({ offer }: { offer: OffreSummary }) {
         </span>
       </div>
       <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-b border-border pb-5 text-small text-textSecondary">
-        {(offer.location || offer.country) && <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {offer.location || offer.country}</span>}
+        {(offer.location || offer.country) && (
+          <span className="inline-flex items-start gap-1.5">
+            <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              {offer.location || offer.country}
+              {understoodPlace(offer) && <> · lieu compris : {understoodPlace(offer)}</>}
+              {distanceLabel(offer) && <span className="whitespace-nowrap font-semibold text-text"> · {offer.same_city || offer.same_dept ? distanceLabel(offer) : `${distanceLabel(offer)} à vol d’oiseau`}</span>}
+            </span>
+          </span>
+        )}
         {offer.posted_at && <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-4 w-4" /> {formatRelativeDate(offer.posted_at)}</span>}
         {offer.contract_category !== "autre" && <span>{CONTRACT_LABELS[offer.contract_category]}</span>}
       </div>

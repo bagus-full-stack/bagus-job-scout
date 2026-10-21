@@ -1,4 +1,6 @@
 import "server-only";
+import { geoGeneration, haversineKm, resolveOfferLocation, type GeoPrecision } from "@/lib/geo";
+import { depOfInsee, roundKm } from "@/lib/distance/format";
 import { getDb, asJson, parseJson } from "./index";
 import type { ScrapedOffre } from "@/lib/scrapers/base";
 import type { ScoreResult } from "@/lib/ai/score-offre";
@@ -54,21 +56,47 @@ export type OffreSummary = Pick<
 > & {
   description_text: string;
   score_reason: string | null;
+  /** Distance à vol d'oiseau depuis la ville de référence (km), null si inconnue ou sans ville. */
+  distance_km: number | null;
+  /** Même commune que la ville de référence (arrondissements de Paris, Lyon, Marseille compris). */
+  same_city: boolean;
+  /** Lieu connu seulement au département, celui de la ville de référence. */
+  same_dept: boolean;
+  /** Lieu reconnu (« Saint-Denis (93) », « Bruxelles, Belgique »), ou null. */
+  geo_label: string | null;
+  geo_precision: GeoPrecision | null;
 };
 
-export type OffersSort = "smart" | "newest" | "oldest" | "score";
+export type OffersSort = "smart" | "newest" | "oldest" | "score" | "distance";
+
+/** Ville de référence du filtre par distance (lib/distance/home.ts), passée par l'appelant. */
+export type DistanceOrigin = { code: string; label: string; lat: number; lng: number };
+
+/** Comptes du menu « Distance », calculés sur les offres qui passent les autres filtres. */
+export type DistanceFacets = {
+  home: { code: string; label: string } | null;
+  /** Offres dans chaque rayon (clé = rayon en km, « 0 » = dans la commune). */
+  counts: Record<string, number>;
+  /** Offres dont on connaît la distance ; offres EN FRANCE dont on ne la connaît pas (lieu absent, région,
+   * télétravail). Les offres à l'étranger sans ville ne sont jamais dans un rayon autour d'une ville française. */
+  located: number;
+  unlocated: number;
+};
+
+/** Facettes de toute la base, calculées une fois par construction du cache. */
+type BaseFacets = {
+  total: number;
+  countries: string[];
+  sources: string[];
+  contractCounts: Record<ContractCategory, number>;
+  hasVie: boolean;
+};
 
 export type OffersSearch = {
   offers: OffreSummary[];
   total: number;
   pageSize: number;
-  facets: {
-    total: number;
-    countries: string[];
-    sources: string[];
-    contractCounts: Record<ContractCategory, number>;
-    hasVie: boolean;
-  };
+  facets: BaseFacets & { distance: DistanceFacets };
 };
 
 const OFFER_PAGE_SIZE = 24;
@@ -94,7 +122,13 @@ function normalizeSearch(value: string): string {
 // texte : ~250 ms par clic de filtre, ~600 ms par recherche. Les lignes prêtes à
 // filtrer restent en mémoire et sont reconstruites dès que la base change.
 
-type CachedOffre = Omit<OffreSummary, "description_text" | "score_reason"> & {
+type CachedOffre = Omit<OffreSummary, "description_text" | "score_reason" | "distance_km" | "same_city" | "same_dept"> & {
+  /** Lieu non placé mais en France (ou pays inconnu) : candidat à « Les inclure ». */
+  geo_unlocated_fr: boolean;
+  geo_lat: number | null;
+  geo_lng: number | null;
+  /** Code INSEE de la commune française reconnue (comparaison « dans votre ville »). */
+  geo_code: string | null;
   /** 1 000 premiers caractères : tout ce que l’aperçu affiche. */
   excerpt: string;
   /** JSON brut, lu seulement pour les offres de la page renvoyée. */
@@ -109,7 +143,7 @@ type OffresCache = {
   orderedAt: number;
   /** Titre, entreprise, pays, lieu et description complète, sans accents ; construit à la première recherche. */
   haystacks: Map<number, string> | null;
-  facets: OffersSearch["facets"];
+  facets: BaseFacets;
 };
 
 const ORDER_TTL_MS = 60_000;
@@ -122,19 +156,21 @@ let offresCache: OffresCache | null = null;
  * - `total_changes()` compte les lignes écrites par CETTE connexion (scan, re-score,
  *   documents générés, suppressions…), y compris les écritures sans date comme le re-score.
  * Toute écriture invalide donc le cache ; aucune ne peut le laisser périmé.
+ * - `geoGeneration()` change quand la base géographique se recharge après une panne :
+ *   les positions calculées sur la base vide sont alors refaites.
  */
 function dbFingerprint(): string {
   const db = getDb();
   const version = (db.prepare("PRAGMA data_version").get() as { data_version: number }).data_version;
   const changes = (db.prepare("SELECT total_changes() AS n").get() as { n: number }).n;
-  return `${version}:${changes}`;
+  return `${version}:${changes}:${geoGeneration()}`;
 }
 
 type CacheRow = Pick<
   OffreRow,
   "id" | "source" | "url" | "title" | "company" | "country" | "location" |
   "contract_type" | "description_status" | "posted_at" | "score" | "is_vie"
-> & { head: string | null; excerpt: string | null; score_breakdown: string | null; has_cv: number; has_lm: number };
+> & { head: string | null; excerpt: string | null; score_breakdown: string | null; has_cv: number; has_lm: number; geo_hint: unknown; geo_dep: string | null };
 
 function buildOffresCache(fingerprint: string): OffresCache {
   // La description entière ne remonte pas : 4 000 caractères suffisent à classer le
@@ -146,7 +182,15 @@ function buildOffresCache(fingerprint: string): OffresCache {
       substr(o.description_text, 1, 4000) AS head,
       substr(o.description_text, 1, 1000) AS excerpt,
       EXISTS(SELECT 1 FROM documents WHERE offre_id = o.id AND type = 'cv') AS has_cv,
-      EXISTS(SELECT 1 FROM documents WHERE offre_id = o.id AND type = 'lm') AS has_lm
+      EXISTS(SELECT 1 FROM documents WHERE offre_id = o.id AND type = 'lm') AS has_lm,
+      -- Indices de lieu propres à la source (lib/geo) : département de l'APEC, télétravail de WTTJ.
+      CASE WHEN json_valid(o.raw_payload) THEN CASE o.source
+        WHEN 'apec' THEN json_extract(o.raw_payload, '$.lieuTexte')
+        WHEN 'wttj' THEN json_extract(o.raw_payload, '$.remote')
+      END END AS geo_hint,
+      -- France Travail range parfois le département dans le champ entreprise (« 974 »).
+      CASE WHEN o.source = 'francetravail' AND (trim(o.company) GLOB '[0-9][0-9]' OR trim(o.company) GLOB '[0-9][0-9][0-9]' OR trim(o.company) IN ('2A', '2B'))
+        THEN trim(o.company) END AS geo_dep
     FROM offres o ORDER BY ${SMART_ORDER}
   `).all() as CacheRow[];
 
@@ -160,6 +204,13 @@ function buildOffresCache(fingerprint: string): OffresCache {
     contractCounts[contract_category]++;
     if (row.country) countries.add(row.country);
     sources.add(row.source);
+    const geo = resolveOfferLocation({
+      source: row.source, location: row.location, country: row.country,
+      // Indice textuel seulement (une valeur JSON d'un autre type ne doit rien casser).
+      hint: row.geo_dep ?? (typeof row.geo_hint === "string" ? row.geo_hint : null),
+      head: row.source === "talent" ? (row.head ?? "").slice(0, 400) : null,
+    });
+    const countryKey = normalizeSearch((row.country ?? "").trim());
     const offer: CachedOffre = {
       id: row.id, source: row.source, url: row.url, title: row.title,
       company: row.company, country: row.country, location: row.location,
@@ -169,6 +220,9 @@ function buildOffresCache(fingerprint: string): OffresCache {
       // substr() compte des caractères, slice() des unités UTF-16 (émojis) : on
       // recoupe pour rendre exactement l’extrait d’avant.
       excerpt: (row.excerpt ?? "").slice(0, 1000), score_breakdown: row.score_breakdown,
+      geo_lat: geo.lat, geo_lng: geo.lng, geo_code: geo.lat !== null ? geo.code ?? null : null,
+      geo_label: geo.label, geo_precision: geo.precision,
+      geo_unlocated_fr: geo.lat === null && (geo.country ? geo.country === "FR" : countryKey === "" || countryKey === "france"),
     };
     byId.set(offer.id, offer);
     smart.push(offer);
@@ -228,6 +282,18 @@ export function parseMinScore(raw: string | null | undefined): number {
   return Number.isInteger(n) && n >= 1 && n <= 100 ? n : 0;
 }
 
+/** Rayons du menu « Distance » (km) ; 0 = dans la commune. Même liste que lib/distance/format.ts. */
+const DISTANCE_BUCKETS = [0, 5, 10, 20, 30, 50, 100, 200] as const;
+
+/** Arrondissements de Paris, Lyon et Marseille → commune entière. */
+function cityCodeOf(code: string | null | undefined): string | null {
+  if (!code) return null;
+  if (/^751\d\d$/.test(code)) return "75056";
+  if (/^6938\d$/.test(code)) return "69123";
+  if (/^132\d\d$/.test(code)) return "13055";
+  return code;
+}
+
 /** Filtrage côté serveur : seules les cartes de la page courante sont envoyées au navigateur. */
 export function searchOffres(opts: {
   query?: string;
@@ -239,6 +305,12 @@ export function searchOffres(opts: {
   /** Raccourci de ?vie=1 : même règle que la puce contrat « V.I.E » (contract_category). */
   vieOnly?: boolean;
   sortBy?: OffersSort;
+  /** Ville de référence (lib/distance/home.ts) : sans elle, ni distance, ni rayon, ni tri par distance. */
+  home?: DistanceOrigin | null;
+  /** Rayon en km (0 = dans la commune) ; absent = toutes distances. */
+  radiusKm?: number | null;
+  /** Avec un rayon : garder aussi les offres dont la distance est inconnue. */
+  includeUnlocated?: boolean;
   page?: number;
 } = {}): OffersSearch {
   const cache = getOffresCache();
@@ -256,18 +328,72 @@ export function searchOffres(opts: {
     return true;
   });
 
+  // Distance : calculée à la volée depuis la ville de référence, à chaque requête
+  // (positions des offres prêtes dans le cache), jamais enregistrée ni intégrée au score.
+  const home = opts.home ?? null;
+  const homeCity = home ? cityCodeOf(home.code) : null;
+  const distances = new Map<number, number | null>();
+  const sameCity = new Set<number>();
+  const sameDept = new Set<number>();
+  const homeDept = home ? depOfInsee(home.code) : null;
+  let unlocatedFr = 0;
+  const counts: Record<string, number> = Object.fromEntries(DISTANCE_BUCKETS.map((radius) => [String(radius), 0]));
+  let located = 0;
+  if (home) {
+    for (const row of filtered) {
+      if (row.geo_lat === null || row.geo_lng === null) {
+        distances.set(row.id, null);
+        if (row.geo_unlocated_fr) unlocatedFr++;
+        continue;
+      }
+      const km = haversineKm(home, { lat: row.geo_lat, lng: row.geo_lng });
+      distances.set(row.id, km);
+      located++;
+      const same = !!homeCity && cityCodeOf(row.geo_code) === homeCity;
+      if (same) sameCity.add(row.id);
+      else if (row.geo_precision === "departement" && row.geo_code === homeDept) sameDept.add(row.id);
+      // Chaque rayon contient la ville (arrondissements dont le centre est à 6 km du centre de Paris)
+      // et compare la distance AFFICHÉE (arrondie), pour que ce qui est écrit et ce qui est filtré concordent.
+      for (const radius of DISTANCE_BUCKETS) {
+        if (same || (radius > 0 && roundKm(km) <= radius)) counts[String(radius)]++;
+      }
+    }
+  }
+  const radius = home && typeof opts.radiusKm === "number" && opts.radiusKm >= 0 ? opts.radiusKm : null;
+  const inRadius = radius === null ? filtered : filtered.filter((row) => {
+    const km = distances.get(row.id);
+    if (km === null || km === undefined) return !!opts.includeUnlocated && row.geo_unlocated_fr;
+    return sameCity.has(row.id) || (radius > 0 && roundKm(km) <= radius);
+  });
+
   // Tris stables : les ex æquo gardent l’ordre intelligent, lui-même départagé par id.
-  if (opts.sortBy === "score") filtered.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-  if (opts.sortBy === "newest") filtered.sort((a, b) => compareText(b.posted_at ?? "", a.posted_at ?? ""));
+  if (opts.sortBy === "distance" && home) {
+    // Distances inconnues en fin de liste ; les nombreuses offres d'une même ville sont au
+    // même point : l'ordre intelligent les départage, sans quoi « Afficher davantage »
+    // répéterait des offres.
+    // « Dans votre ville » d'abord (un arrondissement peut être à 6 km du centre de la ville),
+    // puis les distances : une offre connue au seul département ne s'intercale pas dans la ville.
+    inRadius.sort((a, b) => {
+      const sa = sameCity.has(a.id);
+      const sb = sameCity.has(b.id);
+      if (sa || sb) return Number(sb) - Number(sa);
+      const da = distances.get(a.id) ?? null;
+      const db = distances.get(b.id) ?? null;
+      if (da === null || db === null) return Number(da === null) - Number(db === null);
+      return da - db;
+    });
+  }
+  if (opts.sortBy === "score") inRadius.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  if (opts.sortBy === "newest") inRadius.sort((a, b) => compareText(b.posted_at ?? "", a.posted_at ?? ""));
   if (opts.sortBy === "oldest") {
     // Dates inconnues en fin de liste, comme en 3.4.10.
-    filtered.sort((a, b) => {
+    inRadius.sort((a, b) => {
       if (!a.posted_at || !b.posted_at) return Number(!a.posted_at) - Number(!b.posted_at);
       return compareText(a.posted_at, b.posted_at);
     });
   }
   const page = Math.max(1, Math.min(10000, Math.trunc(opts.page ?? 1) || 1));
-  const visible = filtered.slice((page - 1) * OFFER_PAGE_SIZE, page * OFFER_PAGE_SIZE);
+  const visible = inRadius.slice((page - 1) * OFFER_PAGE_SIZE, page * OFFER_PAGE_SIZE);
   return {
     offers: visible.map((row) => ({
       id: row.id, source: row.source, url: row.url, title: row.title,
@@ -278,10 +404,21 @@ export function searchOffres(opts: {
       score_reason: parseJson<{ reason?: string } | null>(row.score_breakdown, null)?.reason ?? null,
       contract_category: row.contract_category,
       has_cv: row.has_cv, has_lm: row.has_lm,
+      distance_km: distances.get(row.id) ?? null,
+      same_city: sameCity.has(row.id),
+      same_dept: sameDept.has(row.id),
+      geo_label: row.geo_label, geo_precision: row.geo_precision,
     })),
-    total: filtered.length,
+    total: inRadius.length,
     pageSize: OFFER_PAGE_SIZE,
-    facets: cache.facets,
+    // Pays, sources et contrats de toute la base ; comptes du menu « Distance » sur les offres filtrées.
+    facets: {
+      ...cache.facets,
+      distance: {
+        home: home ? { code: home.code, label: home.label } : null,
+        counts, located, unlocated: home ? unlocatedFr : 0,
+      },
+    },
   };
 }
 
