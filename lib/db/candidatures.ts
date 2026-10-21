@@ -1,5 +1,6 @@
 import "server-only";
 import { getDb, plainAll } from "./index";
+import { ensureOffresRepaired } from "./repair-markup";
 
 export type CandidatureRow = {
   id: number;
@@ -31,6 +32,9 @@ export const STATUS = ["envoyee", "en_cours", "entretien", "refusee", "acceptee"
 export type Status = (typeof STATUS)[number];
 
 export function listCandidatures(): CandidatureWithOffre[] {
+  // Titres et entreprises lus dans offres sans passer par lib/db/offres.ts : réparations
+  // uniques des offres d'abord (page Candidatures, export, API), sans coût ensuite.
+  ensureOffresRepaired();
   const rows = getDb()
     .prepare(
       `SELECT c.*,
@@ -156,6 +160,7 @@ export type UpcomingDeadline = {
  * Les chaînes vides comptent comme absentes : certaines sources n'ont pas d'entreprise.
  */
 export function upcomingDeadlines(limit = 5): UpcomingDeadline[] {
+  ensureOffresRepaired(); // comme listCandidatures
   const rows = getDb()
     .prepare(
       `SELECT c.id, c.offre_id, c.deadline, c.status,

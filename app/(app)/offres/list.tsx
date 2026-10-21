@@ -10,14 +10,10 @@ import { cn, formatRelativeDate, scoreColor } from "@/lib/utils";
 import type { OffreSummary, OffersSearch, OffersSort } from "@/lib/db/offres";
 import { CONTRACT_LABELS, CONTRACT_ORDER, type ContractCategory } from "@/lib/contracts";
 import { SOURCES_META } from "@/lib/sources-meta";
+import { previewExcerpt } from "@/lib/offres/preview";
 
 const sourceLabels = Object.fromEntries(SOURCES_META.map((source) => [source.id, source.label]));
 const numberFormat = new Intl.NumberFormat("fr-FR");
-
-function decodeCodePoint(match: string, value: string, radix: number): string {
-  const point = parseInt(value, radix);
-  return Number.isFinite(point) && point <= 0x10ffff ? String.fromCodePoint(point) : match;
-}
 
 /** « 1 offre correspond », « 12 offres correspondent », « Aucune offre ne correspond ». */
 function resultLabel(total: number, filtered: boolean): string {
@@ -277,14 +273,8 @@ function OfferRowContent({ offer }: { offer: OffreSummary }) {
 
 function OfferPreview({ offer }: { offer: OffreSummary }) {
   const score = scoreColor(offer.score ?? 0);
-  const excerpt = offer.description_text
-    .replace(/&#x([\da-f]+);/gi, (match, value: string) => decodeCodePoint(match, value, 16))
-    .replace(/&#(\d+);/g, (match, value: string) => decodeCodePoint(match, value, 10))
-    .replace(/&amp;/g, "&")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 680);
+  // Décodage garde-fou et coupe : lib/offres/preview.ts (testé).
+  const excerpt = previewExcerpt(offer.description_text);
   return (
     <aside aria-label={`Aperçu : ${offer.title}`} className="glass-panel focus-card page-enter sticky top-6 hidden p-6 xl:block">
       <div className="flex flex-wrap items-center justify-between gap-2">

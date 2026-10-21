@@ -3,6 +3,8 @@ import { getDb, asJson, parseJson } from "./index";
 import type { ScrapedOffre } from "@/lib/scrapers/base";
 import type { ScoreResult } from "@/lib/ai/score-offre";
 import { classifyContract, CONTRACT_ORDER, type ContractCategory } from "@/lib/contracts";
+import { fixMojibake, sanitizeScrapedOffre } from "@/lib/offres/clean-text";
+import { ensureOffresRepaired } from "./repair-markup";
 
 export type { ScrapedOffre };
 
@@ -184,6 +186,11 @@ function buildOffresCache(fingerprint: string): OffresCache {
 }
 
 function getOffresCache(): OffresCache {
+  // Réparations uniques des offres déjà en base (entités HTML, puis balisage en
+  // clair), avant toute lecture : un serveur déjà lancé les fait à la première
+  // requête. L'empreinte suffirait à reconstruire le cache après leurs UPDATE ; on le vide
+  // aussi explicitement.
+  if (ensureOffresRepaired() > 0) offresCache = null;
   const fingerprint = dbFingerprint();
   if (!offresCache || offresCache.fingerprint !== fingerprint) {
     offresCache = buildOffresCache(fingerprint);
@@ -280,6 +287,9 @@ export function searchOffres(opts: {
 
 /** Les six premières suggestions suffisent au tableau de bord. */
 export function suggestedOffres(limit: number, untracked = false): Pick<OffreRow, "id" | "title" | "company" | "country" | "location" | "posted_at" | "score">[] {
+  // Lecture directe de la base (sans le cache) : les réparations uniques passent d'abord,
+  // comme pour les autres lectures.
+  ensureOffresRepaired();
   return getDb().prepare(`
     SELECT o.id, o.title, o.company, o.country, o.location, o.posted_at, o.score
     FROM offres o
@@ -288,23 +298,15 @@ export function suggestedOffres(limit: number, untracked = false): Pick<OffreRow
   `).all(Math.max(1, Math.min(20, Math.trunc(limit)))) as Pick<OffreRow, "id" | "title" | "company" | "country" | "location" | "posted_at" | "score">[];
 }
 
-// Filet de sécurité anti-mojibake : répare l'UTF-8 double-décodé (é→Ã©, ’→â€™…)
-// quelle que soit la source. Signatures fiables uniquement — "Ã" suivi d'un
-// caractère de continuation n'existe pas en français légitime.
-const MOJIBAKE_RE = /Ã[©¨§ª«»¢€‚„¯´¹]|â€™|â€“|â€œ|â€|Ã‰|Ã€|Ã‡|Ã”|Ã‚|Â[«»°€œ]/;
-
-export function fixMojibake(s: string | null): string | null {
-  if (!s || !MOJIBAKE_RE.test(s)) return s;
-  try {
-    const repaired = Buffer.from(s, "latin1").toString("utf8");
-    // On n'accepte la réparation que si elle n'introduit pas de caractère de
-    // remplacement (perte) et qu'elle réduit bien les signatures mojibake.
-    if (!repaired.includes("�") && !MOJIBAKE_RE.test(repaired)) return repaired;
-  } catch {}
-  return s;
-}
+// Filet de nettoyage (entités HTML, mojibake) : lib/offres/clean-text.ts. fixMojibake
+// reste exporté d'ici pour les appelants existants.
+export { fixMojibake };
 
 export function upsertOffreFromSource(source: string, o: ScrapedOffre): number {
+  // Réparations des offres déjà en base AVANT la première écriture du nouveau code
+  // (un scan lancé avant toute page ouverte) : sinon elles repasseraient sur des textes déjà
+  // nettoyés par le filet, et le décodage n'est pas idempotent.
+  ensureOffresRepaired();
   const db = getDb();
   const stmt = db.prepare(`
     INSERT INTO offres (source, source_id, url, title, company, country, location, contract_type, salary,
@@ -328,18 +330,21 @@ export function upsertOffreFromSource(source: string, o: ScrapedOffre): number {
       scrape_errors = excluded.scrape_errors,
       scraped_at = datetime('now')
   `);
+  // Un seul passage du filet par offre scrapée : le décodage d'entités n'est pas
+  // idempotent (« &amp;lt; » → « &lt; » → « < »).
+  const c = sanitizeScrapedOffre(o, source);
   stmt.run({
     source,
-    source_id: o.source_id,
-    url: o.url,
-    title: fixMojibake(o.title) ?? o.title,
-    company: fixMojibake(o.company) ?? o.company,
-    country: fixMojibake(o.country),
-    location: fixMojibake(o.location),
-    contract_type: fixMojibake(o.contract_type),
-    salary: fixMojibake(o.salary),
-    description_html: fixMojibake(o.description_html) ?? o.description_html,
-    description_text: fixMojibake(o.description_text) ?? o.description_text,
+    source_id: c.source_id,
+    url: c.url,
+    title: c.title,
+    company: c.company,
+    country: c.country,
+    location: c.location,
+    contract_type: c.contract_type,
+    salary: c.salary,
+    description_html: c.description_html,
+    description_text: c.description_text,
     description_status: o.description_status,
     posted_at: o.posted_at,
     is_vie: o.is_vie ? 1 : 0,
@@ -364,6 +369,7 @@ export function listOffres(opts?: {
   vieOnly?: boolean;
   minScore?: number;
 }): OffreFiltered[] {
+  ensureOffresRepaired();
   const db = getDb();
   const conds: string[] = [];
   const params: any[] = [];
@@ -411,6 +417,7 @@ export function listOffres(opts?: {
 }
 
 export function getOffre(id: number): OffreFiltered | null {
+  ensureOffresRepaired();
   const db = getDb();
   const r = db
     .prepare(
