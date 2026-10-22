@@ -5,7 +5,7 @@ import { getLlmConfig } from "@/lib/ai/client";
 import { scoreOffres } from "@/lib/ai/score-offre";
 
 /** Nombre d'offres affinées par l'IA à chaque passage (les mieux classées par le scoring local). */
-export const AI_PASS_LIMIT = 40;
+export const AI_PASS_LIMIT = 60;
 
 /** Taille d'un appel IA : au-delà, la génération dépasse le délai du fournisseur (Gemini : 180 s). */
 const AI_BATCH_SIZE = 20;
