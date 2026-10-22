@@ -1,23 +1,17 @@
 import "server-only";
 import * as React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { CVDocument, LMDocument } from "./cv-template";
+import { CVDocument, LMDocument, CV_FONT_SIZES } from "./cv-template";
 import { compareRecentFirst } from "@/lib/ai/cv-shape";
 import type { GeneratedCV } from "@/lib/ai/generate-cv";
 import type { GeneratedLM } from "@/lib/ai/generate-lm";
 import type { DocLang } from "@/lib/text/lang";
 
-// pdf-parse expose numpages — usage en .js pour éviter l'effet de bord d'import
-async function pdfPageCount(buf: Buffer): Promise<number> {
-  const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default as (
-    b: Buffer
-  ) => Promise<{ numpages: number }>;
-  try {
-    const r = await pdfParse(buf);
-    return r.numpages || 1;
-  } catch {
-    return 1;
-  }
+// Compte les objets /Type /Page du PDF produit par react-pdf. pdf-parse échouait
+// sans bruit dans le serveur (le catch renvoyait 1), donc un CV de 2 pages passait
+// pour une page et n'était jamais réduit.
+export async function pdfPageCount(buf: Buffer): Promise<number> {
+  return Math.max(1, (buf.toString("latin1").match(/\/Type\s*\/Page(?![s\w])/g) ?? []).length);
 }
 
 // =============================================================
@@ -50,7 +44,13 @@ function shrinkCV(cv: GeneratedCV, level: number): GeneratedCV {
   if (words.length > summaryWords) {
     summary = words.slice(0, summaryWords).join(" ").replace(/[,;:]?$/, "") + ".";
   }
-  const skills_flat = (cv.sections.skills_flat ?? []).slice(0, skillsCap);
+  const skill_groups = (cv.sections.skill_groups ?? []).map((g) => ({
+    ...g,
+    items: g.items.slice(0, Math.max(4, 10 - level * 2)),
+  }));
+  const skills_flat = skill_groups.length
+    ? skill_groups.flatMap((g) => g.items)
+    : (cv.sections.skills_flat ?? []).slice(0, skillsCap);
   // Le projet personnel est le premier sacrifié quand la page déborde.
   const projects = (cv.sections.projects ?? [])
     .slice(0, level >= 3 ? 0 : 1)
@@ -59,7 +59,7 @@ function shrinkCV(cv: GeneratedCV, level: number): GeneratedCV {
   return {
     ...cv,
     summary,
-    sections: { ...cv.sections, experiences, educations, skills_flat, projects },
+    sections: { ...cv.sections, experiences, educations, skills_flat, skill_groups, projects },
   };
 }
 
@@ -75,24 +75,40 @@ function trimSentence(s: string, level: number): string {
 }
 
 /**
- * Renders CV to PDF, retrying with progressively shrunk content if it exceeds 1 page.
- * Returns BOTH the buffer AND the final cv data used (so DOCX can use the same content).
+ * Renders CV to PDF. Le contenu complet est d'abord rendu avec la plus grande
+ * taille de police qui tient sur une page (pas de vide en bas) ; si même la plus
+ * petite déborde, le contenu est réduit progressivement.
+ * Returns the buffer, the final cv data AND the font size used (so DOCX matches).
  */
 export async function fitCVToOnePage(
   cv: GeneratedCV,
   language: DocLang = "fr"
-): Promise<{ pdf: Buffer; cv: GeneratedCV }> {
+): Promise<{ pdf: Buffer; cv: GeneratedCV; fontSize: number }> {
+  const render = (c: GeneratedCV, fontSize: number) =>
+    renderToBuffer(React.createElement(CVDocument, { cv: c, language, fontSize }) as any);
+  const fits = async (c: GeneratedCV, fontSize: number) => (await pdfPageCount(await render(c, fontSize))) <= 1;
+  const smallest = CV_FONT_SIZES[0];
   let current = cv;
   for (let level = 0; level < 4; level++) {
-    const buf = await renderToBuffer(React.createElement(CVDocument, { cv: current, language }) as any);
-    const pages = await pdfPageCount(buf);
-    if (pages <= 1) return { pdf: buf, cv: current };
+    if (await fits(current, smallest)) {
+      // Plus grande taille qui tient (la mise en page croît avec la taille : recherche dichotomique).
+      let lo = 0;
+      let hi = CV_FONT_SIZES.length - 1;
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2);
+        if (await fits(current, CV_FONT_SIZES[mid])) lo = mid;
+        else hi = mid - 1;
+      }
+      return { pdf: await render(current, CV_FONT_SIZES[lo]), cv: current, fontSize: CV_FONT_SIZES[lo] };
+    }
     current = shrinkCV(current, level + 1);
   }
-  // Last resort
+  // Last resort : contenu réduit au maximum, police sous le minimum jusqu'à tenir sur une page.
   const final = shrinkCV(current, 4);
-  const buf = await renderToBuffer(React.createElement(CVDocument, { cv: final, language }) as any);
-  return { pdf: buf, cv: final };
+  for (const fontSize of [smallest, 8, 7.5]) {
+    if (await fits(final, fontSize)) return { pdf: await render(final, fontSize), cv: final, fontSize };
+  }
+  return { pdf: await render(final, 7.5), cv: final, fontSize: 7.5 };
 }
 
 export async function renderCVPdf(cv: GeneratedCV, language: DocLang = "fr"): Promise<Buffer> {

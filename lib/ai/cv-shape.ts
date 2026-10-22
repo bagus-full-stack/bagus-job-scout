@@ -51,11 +51,16 @@ const generatedCVSchema = z.object({
     linkedin_url: nullableText,
     portfolio_url: nullableText,
   }),
+  headline: z.string().nullish().transform((v) => v ?? ""),
   summary: z.string().nullish().transform((v) => v ?? ""),
   sections: z.object({
     experiences: z.array(experienceSchema),
     educations: z.array(educationSchema).nullish().transform((v) => v ?? []),
     skills_flat: z.array(z.string()).nullish().transform((v) => v ?? []),
+    skill_groups: z
+      .array(z.object({ label: z.string(), items: z.array(z.string()).nullish().transform((v) => v ?? []) }))
+      .nullish()
+      .transform((v) => v ?? []),
     languages: z
       .array(z.object({ name: z.string(), level: nullableText }))
       .nullish()
@@ -101,6 +106,9 @@ export function parseGeneratedCV(input: unknown): GeneratedCV {
       "La réponse IA pour le CV ne contient aucune expérience — relancez la génération."
     );
   }
+  // Les sections sont la source ; skills_flat (validation, repli) en est l'aplatissement.
+  const { skill_groups } = parsed.data.sections;
+  if (skill_groups.length) parsed.data.sections.skills_flat = skill_groups.flatMap((g) => g.items);
   return parsed.data;
 }
 

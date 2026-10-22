@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, FileText, Mail, MessageSquare, Download, Sparkles, FolderOpen, ArrowUpRight, BookmarkPlus, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,19 @@ export function ActionsPanel({
   const [justApplied, setJustApplied] = useState(false);
   const [trackingStatus, setTrackingStatus] = useState<string | null>(initialTrackingStatus);
   const [folder, setFolder] = useState<string | null>(initialFolder);
+  // Le Word est optionnel : choix mémorisé par navigateur (sans stockage, il reste décoché).
+  const [wantDocx, setWantDocx] = useState(false);
+  useEffect(() => {
+    try {
+      setWantDocx(localStorage.getItem("jobscout:docx") === "1");
+    } catch {}
+  }, []);
+  function toggleDocx(v: boolean) {
+    setWantDocx(v);
+    try {
+      localStorage.setItem("jobscout:docx", v ? "1" : "0");
+    } catch {}
+  }
 
   // Un document existe dès qu'un de ses deux formats est enregistré : sur un
   // échec survenu entre l'écriture du PDF et celle du DOCX, la ligne doit
@@ -88,7 +101,7 @@ export function ActionsPanel({
       const res = await fetch("/api/generate/all", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ offreId }),
+        body: JSON.stringify({ offreId, docx: wantDocx }),
       });
       // res.ok AVANT res.json() : un corps non-JSON (page HTML d'erreur d'un
       // proxy/edge) ne doit pas masquer le vrai message.
@@ -266,6 +279,11 @@ export function ActionsPanel({
           ? "Régénérer les documents"
           : "Générer les documents"}
       </Button>
+
+      <label className="flex cursor-pointer items-center gap-2 text-small text-textSecondary">
+        <input type="checkbox" checked={wantDocx} onChange={(e) => toggleDocx(e.target.checked)} disabled={allLoading} />
+        Générer aussi les versions Word (.docx)
+      </label>
 
       {/* Download row — primary DOCX, secondary PDF.
           Chaque ligne est conditionnée à SES PROPRES identifiants : en succès

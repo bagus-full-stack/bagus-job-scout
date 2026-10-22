@@ -24,64 +24,104 @@ Font.registerHyphenationCallback((word) => [word]);
 // « Present », « Languages: »), avec la typographie anglaise.
 // =============================================================
 
-const cvStyles = StyleSheet.create({
-  page: {
-    paddingHorizontal: 42,
-    paddingVertical: 30,
-    fontFamily: "Helvetica",
-    fontSize: 9,
-    lineHeight: 1.22,
-    color: "#000000",
-  },
-  name: {
-    fontSize: 14,
-    fontFamily: "Helvetica-Bold",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    marginBottom: 2,
-  },
-  contactLine: { fontSize: 9, color: "#202020", marginBottom: 8 },
-  sectionTitle: {
-    fontSize: 10,
-    fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginTop: 6,
-    marginBottom: 3,
-  },
-  summary: { fontSize: 9, marginBottom: 2, textAlign: "justify" },
-  expBlock: { marginTop: 3 },
-  expHeaderLine: { fontSize: 9.5, marginBottom: 1 },
-  expTitleBold: { fontFamily: "Helvetica-Bold" },
-  expDates: { fontStyle: "italic", color: "#3a3a3c" },
-  bullet: { flexDirection: "row", marginBottom: 0.5, paddingLeft: 6 },
-  bulletDot: { width: 7, fontSize: 9 },
-  bulletText: { flex: 1, fontSize: 9 },
-  eduBlock: { marginTop: 3 },
-  eduSchool: { fontSize: 9.5, marginBottom: 1 },
-  eduDegree: { fontSize: 9, fontStyle: "italic", color: "#202020", marginBottom: 1 },
-  skillsFlow: { fontSize: 9, marginTop: 2, marginBottom: 2 },
-  languagesLine: { fontSize: 9, fontFamily: "Helvetica-Bold" },
-});
+// Tailles et espacements dérivés de la taille de corps `fs` : fitCVToOnePage choisit
+// la plus grande qui tient sur une page, pour ne pas laisser de vide en bas.
+// Croissant, par pas de 0,25 pt : la plus grande taille qui tient laisse le moins de vide.
+export const CV_FONT_SIZES = Array.from({ length: 11 }, (_, i) => 8.5 + i * 0.25);
+
+const makeStyles = (fs: number) =>
+  StyleSheet.create({
+    page: {
+      paddingHorizontal: 42,
+      paddingVertical: 30,
+      fontFamily: "Helvetica",
+      fontSize: fs,
+      lineHeight: 1.22,
+      color: "#000000",
+    },
+    name: {
+      textAlign: "center",
+      fontSize: fs + 5,
+      fontFamily: "Helvetica-Bold",
+      letterSpacing: 1.2,
+      textTransform: "uppercase",
+      marginBottom: fs * 0.6,
+    },
+    headline: { textAlign: "center", fontSize: fs + 2, fontFamily: "Helvetica-Bold", marginBottom: fs * 0.5 },
+    contactLine: { fontSize: fs, color: "#202020", marginBottom: fs * 0.9 },
+    sectionTitle: {
+      fontSize: fs + 1,
+      fontFamily: "Helvetica-Bold",
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginTop: fs * 0.8,
+      marginBottom: 3,
+      paddingBottom: 1,
+      borderBottomWidth: 0.6,
+      borderBottomColor: "#000000",
+    },
+    summary: { fontSize: fs, marginBottom: 2, textAlign: "justify" },
+    expBlock: { marginTop: fs * 0.4 },
+    headerRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 1, fontSize: fs + 0.5 },
+    headerTitle: { flex: 1, paddingRight: 8 },
+    headerTail: { flexShrink: 0, fontStyle: "italic", color: "#3a3a3c" },
+    expHeaderLine: { fontSize: fs + 0.5, marginBottom: 1 },
+    expTitleBold: { fontFamily: "Helvetica-Bold" },
+    expDates: { fontStyle: "italic", color: "#3a3a3c" },
+    bullet: { flexDirection: "row", marginBottom: fs * 0.1, paddingLeft: 6 },
+    bulletDot: { width: 7, fontSize: fs },
+    bulletText: { flex: 1, fontSize: fs },
+    eduBlock: { marginTop: fs * 0.4 },
+    eduSchool: { fontSize: fs + 0.5, marginBottom: 1 },
+    eduDegree: { fontSize: fs, fontStyle: "italic", color: "#202020", marginBottom: 1 },
+    skillsFlow: { fontSize: fs, marginTop: 2, marginBottom: 2 },
+    skillLabel: { fontFamily: "Helvetica-Bold" },
+    languagesLine: { fontSize: fs, fontFamily: "Helvetica-Bold" },
+  });
+
+type CvStyles = ReturnType<typeof makeStyles>;
 
 type Ty = (s: string | null | undefined) => string;
 
-function Bullets({ items, ty }: { items: string[]; ty: Ty }) {
+function Bullets({ items, ty, st }: { items: string[]; ty: Ty; st: CvStyles }) {
   return (
     <>
       {items
         .filter((b) => b && b.trim())
         .map((b, j) => (
-          <View key={j} style={cvStyles.bullet}>
-            <Text style={cvStyles.bulletDot}>•</Text>
-            <Text style={cvStyles.bulletText}>{ty(b)}</Text>
+          <View key={j} style={st.bullet}>
+            <Text style={st.bulletDot}>•</Text>
+            <Text style={st.bulletText}>{ty(b)}</Text>
           </View>
         ))}
     </>
   );
 }
 
-export function CVDocument({ cv, language = "fr" }: { cv: GeneratedCV; language?: DocLang }) {
+// Titre à gauche (il peut passer sur 2 lignes), dates à droite : aucun séparateur à
+// couper, donc plus de tiret parasite en fin de ligne.
+function HeaderRow({ st, title, tail }: { st: CvStyles; title: string; tail: string }) {
+  return (
+    <View style={st.headerRow}>
+      <Text style={[st.expTitleBold, st.headerTitle]}>{title}</Text>
+      {tail ? <Text style={st.headerTail}>{tail}</Text> : null}
+    </View>
+  );
+}
+
+export function CVDocument({
+  cv,
+  language = "fr",
+  fontSize = 9,
+  probe = 0,
+}: {
+  cv: GeneratedCV;
+  language?: DocLang;
+  fontSize?: number;
+  /** Hauteur (pt) d'un espaceur final : sert à mesurer la place libre (lib/pdf/fill.ts). */
+  probe?: number;
+}) {
+  const cvStyles = makeStyles(fontSize);
   const L = LABELS[language];
   const ty = typographyFor(language);
   const contact = [
@@ -92,12 +132,24 @@ export function CVDocument({ cv, language = "fr" }: { cv: GeneratedCV; language?
     displayUrl(cv.identity.portfolio_url),
   ].filter(Boolean) as string[];
   const projects = cv.sections.projects ?? [];
+  const groups = (cv.sections.skill_groups ?? []).filter((g) => g.items.length > 0);
 
   return (
     <Document>
       <Page size="A4" style={cvStyles.page}>
         <Text style={cvStyles.name}>{cv.identity.full_name}</Text>
-        {contact.length > 0 && <Text style={cvStyles.contactLine}>{contact.join("  |  ")}</Text>}
+        {cv.headline?.trim() ? <Text style={cvStyles.headline}>{ty(cleanJobTitle(cv.headline))}</Text> : null}
+        {contact.length > 0 && (
+          // Un Text par élément : le saut de ligne ne tombe qu'entre deux éléments (« | - » sinon).
+          <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", marginBottom: fontSize * 0.9 }}>
+            {contact.map((c, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <Text style={{ ...cvStyles.contactLine, marginBottom: 0, marginHorizontal: 5 }}>|</Text>}
+                <Text style={{ ...cvStyles.contactLine, marginBottom: 0 }}>{c}</Text>
+              </React.Fragment>
+            ))}
+          </View>
+        )}
 
         {cv.summary && (
           <>
@@ -111,17 +163,12 @@ export function CVDocument({ cv, language = "fr" }: { cv: GeneratedCV; language?
             <Text style={cvStyles.sectionTitle}>{L.experience}</Text>
             {cv.sections.experiences.map((e, i) => (
               <View key={i} style={cvStyles.expBlock} wrap={false}>
-                <Text style={cvStyles.expHeaderLine}>
-                  <Text style={cvStyles.expTitleBold}>
-                    {cleanJobTitle(e.title)}
-                    {e.company ? ` — ${e.company}` : ""}
-                  </Text>
-                  <Text style={cvStyles.expDates}>
-                    {`  |  ${expDateRange(e.start_date, e.end_date, language)}`}
-                    {e.location ? `  |  ${e.location}` : ""}
-                  </Text>
-                </Text>
-                <Bullets items={e.bullet_points ?? []} ty={ty} />
+                <HeaderRow
+                  st={cvStyles}
+                  title={`${cleanJobTitle(e.title)}${e.company ? ` — ${e.company}` : ""}`}
+                  tail={[expDateRange(e.start_date, e.end_date, language), e.location].filter(Boolean).join("  |  ")}
+                />
+                <Bullets items={e.bullet_points ?? []} ty={ty} st={cvStyles} />
               </View>
             ))}
           </>
@@ -132,16 +179,12 @@ export function CVDocument({ cv, language = "fr" }: { cv: GeneratedCV; language?
             <Text style={cvStyles.sectionTitle}>{projects.length > 1 ? L.projects : L.project}</Text>
             {projects.map((p, i) => (
               <View key={i} style={cvStyles.expBlock} wrap={false}>
-                <Text style={cvStyles.expHeaderLine}>
-                  <Text style={cvStyles.expTitleBold}>
-                    {p.name}
-                    {p.role ? ` — ${p.role}` : ""}
-                  </Text>
-                  <Text style={cvStyles.expDates}>
-                    {`  |  ${[expDateRange(p.start_date, p.end_date, language), displayUrl(p.url)].filter(Boolean).join("  |  ")}`}
-                  </Text>
-                </Text>
-                <Bullets items={p.bullet_points ?? []} ty={ty} />
+                <HeaderRow
+                  st={cvStyles}
+                  title={`${p.name}${p.role ? ` — ${p.role}` : ""}`}
+                  tail={[expDateRange(p.start_date, p.end_date, language), displayUrl(p.url)].filter(Boolean).join("  |  ")}
+                />
+                <Bullets items={p.bullet_points ?? []} ty={ty} st={cvStyles} />
               </View>
             ))}
           </>
@@ -152,16 +195,11 @@ export function CVDocument({ cv, language = "fr" }: { cv: GeneratedCV; language?
             <Text style={cvStyles.sectionTitle}>{L.education}</Text>
             {cv.sections.educations.map((e, i) => (
               <View key={i} style={cvStyles.eduBlock} wrap={false}>
-                <Text style={cvStyles.eduSchool}>
-                  <Text style={cvStyles.expTitleBold}>{e.school}</Text>
-                  <Text style={cvStyles.expDates}>
-                    {`  |  ${eduYearRange(e.start_date, e.end_date, language)}`}
-                  </Text>
-                </Text>
+                <HeaderRow st={cvStyles} title={e.school} tail={eduYearRange(e.start_date, e.end_date, language)} />
                 {(e.degree || e.field) && (
                   <Text style={cvStyles.eduDegree}>{ty([e.degree, e.field].filter(Boolean).join(" — "))}</Text>
                 )}
-                <Bullets items={e.bullet_points ?? []} ty={ty} />
+                <Bullets items={e.bullet_points ?? []} ty={ty} st={cvStyles} />
               </View>
             ))}
           </>
@@ -170,10 +208,23 @@ export function CVDocument({ cv, language = "fr" }: { cv: GeneratedCV; language?
         {(cv.sections.skills_flat?.length || cv.sections.languages.length) ? (
           <>
             <Text style={cvStyles.sectionTitle}>{L.skills}</Text>
-            {cv.sections.skills_flat?.length > 0 && (
-              <Text style={cvStyles.skillsFlow}>
-                {cv.sections.skills_flat.map((s) => capitalizeFirst(s)).join(" | ")}
-              </Text>
+            {groups.length > 0 ? (
+              groups.map((g, i) => (
+                <View key={i} style={cvStyles.bullet}>
+                  <Text style={cvStyles.bulletDot}>•</Text>
+                  <Text style={cvStyles.bulletText}>
+                    <Text style={cvStyles.skillLabel}>{ty(`${capitalizeFirst(g.label)} :`)}</Text>
+                    {" "}
+                    {g.items.map((s) => capitalizeFirst(s)).join(", ")}
+                  </Text>
+                </View>
+              ))
+            ) : (
+              cv.sections.skills_flat?.length > 0 && (
+                <Text style={cvStyles.skillsFlow}>
+                  {cv.sections.skills_flat.map((s) => capitalizeFirst(s)).join(" | ")}
+                </Text>
+              )
             )}
             {cv.sections.languages.length > 0 && (
               <Text style={cvStyles.languagesLine}>
@@ -186,6 +237,7 @@ export function CVDocument({ cv, language = "fr" }: { cv: GeneratedCV; language?
             )}
           </>
         ) : null}
+        {probe > 0 ? <View style={{ height: probe }} /> : null}
       </Page>
     </Document>
   );

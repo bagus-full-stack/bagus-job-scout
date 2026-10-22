@@ -14,7 +14,8 @@ export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
   try {
-    const { offreId } = await req.json();
+    // Le Word est optionnel (`docx: true`) ; le PDF est toujours généré.
+    const { offreId, docx: wantDocx = false } = await req.json();
     const profile = getProfile();
     if (!profile) return NextResponse.json({ error: "Profil introuvable" }, { status: 400 });
     const offre = getOffre(Number(offreId));
@@ -40,17 +41,19 @@ export async function POST(req: NextRequest) {
       lm: initialLM,
       language: lang,
     });
-    const docx = await renderLMDocx({
-      identity,
-      company: offre.company,
-      companyLocation: lang === "en" ? countryNameEnglish(offre.country) : offre.country,
-      lm,
-      language: lang,
-    });
+    const docx = wantDocx
+      ? await renderLMDocx({
+          identity,
+          company: offre.company,
+          companyLocation: lang === "en" ? countryNameEnglish(offre.country) : offre.country,
+          lm,
+          language: lang,
+        })
+      : null;
 
     const meta = { company: offre.company, title: offre.title };
     const pdfDoc = saveDocument({ type: "lm", offreId: offre.id, format: "pdf", buffer: pdf, meta });
-    saveDocument({ type: "lm", offreId: offre.id, format: "docx", buffer: docx, meta });
+    if (docx) saveDocument({ type: "lm", offreId: offre.id, format: "docx", buffer: docx, meta });
 
     return NextResponse.json({ ok: true, document_id: pdfDoc.id, language: lang });
   } catch (e) {

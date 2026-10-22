@@ -13,11 +13,11 @@ export function cvLanguageInstruction(lang: DocLang): string {
     return [
       "## LANGUE DE SORTIE : ANGLAIS — règle absolue",
       "L'offre est rédigée en anglais : le CV ENTIER doit être en anglais, comme s'il avait été écrit par un candidat anglophone pour un recruteur du pays de l'offre. Le profil fourni est en français : TRADUIS TOUT —",
-      "- `summary` ;",
+      "- `headline` et `summary` ;",
       "- les intitulés de poste (« Chargé de marketing » → « Marketing Officer », « Chef de projet » → « Project Manager », « Assistant commercial » → « Sales Assistant ») ;",
       "- toutes les puces d'expériences, de projet et de formation ;",
       "- `degree` et `field` des formations (« Licence professionnelle » → « Professional Bachelor's degree (Licence professionnelle) », « BTS » → « Two-year technical degree (BTS) ») ;",
-      "- `skills_flat` (« Gestion de projet » → « Project management », « Analyse de données » → « Data analysis ») ;",
+      "- `skill_groups` : libellés de sections ET compétences (« Gestion de projet » → « Project management », « Analyse de données » → « Data analysis ») ;",
       "- `languages[].name` (« Français » → « French », « Anglais » → « English », « Allemand » → « German ») et `languages[].level` (« Natif » → « Native », « Courant » → « Fluent » ; garde « B2 (TOEIC 850) ») ;",
       "- `projects[].role` (« Fondateur » → « Founder », « Bénévole » → « Volunteer ») ;",
       "- dates en cours : `end_date` = « Present ».",

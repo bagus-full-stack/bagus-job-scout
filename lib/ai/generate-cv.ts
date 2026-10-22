@@ -20,6 +20,8 @@ export type GeneratedCV = {
     linkedin_url: string | null;
     portfolio_url: string | null;
   };
+  /** Titre sous le nom, adapté à l'offre (ex. « Ingénieur Full Stack »). */
+  headline?: string;
   summary: string;
   sections: {
     experiences: {
@@ -39,6 +41,8 @@ export type GeneratedCV = {
       bullet_points: string[];
     }[];
     skills_flat: string[];
+    /** Compétences par section (Langages, Backend…) ; skills_flat en est l'aplatissement. */
+    skill_groups?: { label: string; items: string[] }[];
     languages: { name: string; level: string | null }[];
     projects: {
       name: string;
@@ -69,6 +73,11 @@ const TOOL = {
           portfolio_url: { type: ["string", "null"] },
         },
         required: ["full_name", "email", "phone", "location", "linkedin_url", "portfolio_url"],
+      },
+      headline: {
+        type: "string",
+        description:
+          "Titre professionnel court (2 à 5 mots) affiché sous le nom, adapté à l'offre et vrai pour le profil, ex. « Ingénieur Full Stack », « Ingénieur IA & Full Stack ». Sans « H/F ».",
       },
       summary: { type: "string" },
       sections: {
@@ -120,10 +129,18 @@ const TOOL = {
               required: ["name", "role", "start_date", "end_date", "bullet_points"],
             },
           },
-          skills_flat: {
+          skill_groups: {
             type: "array",
-            items: { type: "string" },
-            description: "Liste à plat de compétences/outils, pipe-séparés au rendu (ex. 'gestion de projet | KPI | Power BI'). Inclure les langages, frameworks, méthodologies, outils. Pas de catégories.",
+            description:
+              "Compétences organisées par section (4 à 8 sections), ex. « Langages », « Frontend », « Backend & API », « Bases de données », « DevOps & qualité », « IA appliquée », « Méthodes ». Chaque section : un libellé court et 3 à 10 compétences/outils, les plus pertinentes pour l'offre en premier. Aucune compétence en double d'une section à l'autre.",
+            items: {
+              type: "object",
+              properties: {
+                label: { type: "string" },
+                items: { type: "array", items: { type: "string" } },
+              },
+              required: ["label", "items"],
+            },
           },
           languages: {
             type: "array",
@@ -137,10 +154,10 @@ const TOOL = {
             },
           },
         },
-        required: ["experiences", "educations", "skills_flat", "languages"],
+        required: ["experiences", "educations", "skill_groups", "languages"],
       },
     },
-    required: ["identity", "summary", "sections"],
+    required: ["identity", "headline", "summary", "sections"],
   },
 } as const;
 
@@ -153,7 +170,9 @@ let _system: string | null = null;
 export async function generateCV(
   profile: ProfileFull,
   offre: OffreFiltered,
-  lang: DocLang = detectDocLanguage(offre.title, offre.description_text, sourceLanguageHint(offre.source, offre.raw_payload), offre.country)
+  lang: DocLang = detectDocLanguage(offre.title, offre.description_text, sourceLanguageHint(offre.source, offre.raw_payload), offre.country),
+  /** CV déjà rendu mais incomplet : `freeLines` lignes vides à remplir (lib/pdf/fill.ts). */
+  fill?: { current: GeneratedCV; freeLines: number }
 ): Promise<GeneratedCV> {
   if (!_system) _system = fs.readFileSync(path.join(process.cwd(), "prompts", "generate-cv.md"), "utf-8");
   // CV en anglais : le vocabulaire de compétences du profil (français) est
@@ -179,7 +198,11 @@ export async function generateCV(
     tool: TOOL as unknown as StructuredTool,
     user: `${cvLanguageInstruction(lang)}
 
-## Offre cible\n- Titre: ${offre.title}\n- Entreprise: ${offre.company}\n- Pays: ${offre.country ?? ""}\n- Description:\n${offre.description_text.slice(0, 6000)}\n\nGénère le CV optimisé${lang === "en" ? " — entièrement en anglais" : ""}.`,
+## Offre cible\n- Titre: ${offre.title}\n- Entreprise: ${offre.company}\n- Pays: ${offre.country ?? ""}\n- Description:\n${offre.description_text.slice(0, 6000)}\n\nGénère le CV optimisé${lang === "en" ? " — entièrement en anglais" : ""}.${
+      fill
+        ? `\n\n## CV actuel à compléter\n${JSON.stringify(fill.current)}\n\nLa page n'est pas pleine : il reste environ ${fill.freeLines} lignes vides. Renvoie le CV COMPLET en recopiant À L'IDENTIQUE tout l'existant (profil, intitulés, puces, chiffres et noms propres compris : ne reformule, ne raccourcis et ne supprime rien) et en y AJOUTANT uniquement, tirés UNIQUEMENT du profil, des éléments pertinents pour l'offre : puces supplémentaires d'expériences (jusqu'à 4 par poste), un projet de plus (3 au plus), une puce de formation, compétences manquantes, et de NOUVELLES SECTIONS de compétences si le profil les justifie et qu'elles manquent (obligatoire : « IA appliquée » dès que le profil a au moins 3 compétences d'IA/data ; sinon « Data & ML », « Cloud », « Tests & qualité »). N'ajoute pas plus de ${fill.freeLines} lignes.`
+        : ""
+    }`,
   });
   assertNotTruncated(message, "le CV");
   if (!message.input)
@@ -203,8 +226,17 @@ export async function generateCV(
     );
     for (const w of report.warnings) console.log(`  • ${w}`);
   }
+  // Les sections ne gardent que les compétences que le validateur a conservées.
+  const kept = new Set(validated.sections.skills_flat);
+  const skill_groups = (validated.sections.skill_groups ?? [])
+    .map((g) => ({ label: g.label, items: g.items.filter((s) => kept.has(s)) }))
+    .filter((g) => g.items.length > 0);
   // Relecture (orthographe, accords, typographie, faits non étayés) — jamais bloquante.
-  return proofreadCV(enforceAtsLimits(validated), profile, lang);
+  return proofreadCV(
+    enforceAtsLimits({ ...validated, sections: { ...validated.sections, skill_groups } }),
+    profile,
+    lang
+  );
 }
 
 /**
@@ -229,8 +261,11 @@ function enforceAtsLimits(cv: GeneratedCV): GeneratedCV {
   const words = summary.split(/\s+/);
   if (words.length > 90) summary = words.slice(0, 90).join(" ").replace(/[,;:]?$/, "") + ".";
 
-  // Cap skills_flat at 25 to keep one line at the bottom of the page
-  const skills_flat = (cv.sections.skills_flat ?? []).slice(0, 25);
+  // 8 sections de 10 compétences au plus ; skills_flat reste l'aplatissement des sections.
+  const skill_groups = (cv.sections.skill_groups ?? []).slice(0, 8).map((g) => ({ ...g, items: g.items.slice(0, 10) }));
+  const skills_flat = skill_groups.length
+    ? skill_groups.flatMap((g) => g.items)
+    : (cv.sections.skills_flat ?? []).slice(0, 25);
   // Projets personnels : au plus trois, 3 puces chacun — il ne doit jamais évincer une expérience salariée.
   const projects = (cv.sections.projects ?? []).slice(0, 3).map((p) => ({
     ...p,
@@ -245,6 +280,7 @@ function enforceAtsLimits(cv: GeneratedCV): GeneratedCV {
       experiences,
       educations,
       skills_flat,
+      skill_groups,
       projects,
     },
   };

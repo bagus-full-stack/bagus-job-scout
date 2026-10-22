@@ -16,9 +16,10 @@ import { LABELS, letterDateLine, type DocLang } from "@/lib/text/lang";
 const FONT = "Calibri";
 
 // Half-points: 18 = 9pt, 19 = 9.5pt, 20 = 10pt
-const SZ_BODY = 18;
-const SZ_NAME = 26;
-const SZ_SECTION = 20;
+// Fixés au début de renderCVDocx d'après la taille retenue pour le PDF.
+let SZ_BODY = 18;
+let SZ_NAME = 26;
+let SZ_SECTION = 20;
 
 type Ty = (s: string | null | undefined) => string;
 
@@ -59,17 +60,30 @@ function headerLine(title: string, dates: string, extra?: string | null): Paragr
  * CV DOCX — même contenu que le PDF (déjà réduit à une page), mêmes libellés
  * par langue (LABELS) et même typographie (française ou anglaise).
  */
-export async function renderCVDocx(cv: GeneratedCV, language: DocLang = "fr"): Promise<Buffer> {
+export async function renderCVDocx(cv: GeneratedCV, language: DocLang = "fr", fontSize = 9): Promise<Buffer> {
+  SZ_BODY = Math.round(fontSize * 2);
+  SZ_NAME = SZ_BODY + 8;
+  SZ_SECTION = SZ_BODY + 2;
   const L = LABELS[language];
   const ty = typographyFor(language);
   const children: Paragraph[] = [];
 
   children.push(
     new Paragraph({
+      alignment: AlignmentType.CENTER,
       children: [new TextRun({ text: cv.identity.full_name, bold: true, size: SZ_NAME, characterSpacing: 30, font: FONT })],
-      spacing: { after: 60 },
+      spacing: { after: 120 },
     })
   );
+  if (cv.headline?.trim()) {
+    children.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: ty(cleanJobTitle(cv.headline)), bold: true, size: SZ_BODY + 4, font: FONT })],
+        spacing: { after: 100 },
+      })
+    );
+  }
 
   const contact = [
     cv.identity.phone,
@@ -81,6 +95,7 @@ export async function renderCVDocx(cv: GeneratedCV, language: DocLang = "fr"): P
   if (contact.length) {
     children.push(
       new Paragraph({
+        alignment: AlignmentType.CENTER,
         children: [new TextRun({ text: contact.join("  |  "), size: SZ_BODY, font: FONT })],
         spacing: { after: 200 },
       })
@@ -157,7 +172,21 @@ export async function renderCVDocx(cv: GeneratedCV, language: DocLang = "fr"): P
 
   if (cv.sections.skills_flat?.length || cv.sections.languages.length) {
     children.push(sectionTitle(L.skills));
-    if (cv.sections.skills_flat?.length) {
+    const groups = (cv.sections.skill_groups ?? []).filter((g) => g.items.length > 0);
+    if (groups.length) {
+      for (const g of groups) {
+        children.push(
+          new Paragraph({
+            bullet: { level: 0 },
+            spacing: { after: 30 },
+            children: [
+              new TextRun({ text: ty(`${capitalizeFirst(g.label)} : `), bold: true, size: SZ_BODY, font: FONT }),
+              new TextRun({ text: g.items.map((s) => capitalizeFirst(s)).join(", "), size: SZ_BODY, font: FONT }),
+            ],
+          })
+        );
+      }
+    } else if (cv.sections.skills_flat?.length) {
       children.push(
         new Paragraph({
           spacing: { after: 60 },

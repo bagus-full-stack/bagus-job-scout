@@ -223,10 +223,13 @@ async function translateShortFields(cv: GeneratedCV): Promise<GeneratedCV> {
     }
   };
 
+  let headline = cv.headline ?? "";
+  add(headline, (v) => (headline = v));
   const experiences = cv.sections.experiences.map((e) => ({ ...e }));
   const projects = (cv.sections.projects ?? []).map((p) => ({ ...p }));
   const educations = cv.sections.educations.map((e) => ({ ...e }));
   const skills_flat = [...(cv.sections.skills_flat ?? [])];
+  const skill_groups = (cv.sections.skill_groups ?? []).map((g) => ({ label: g.label, items: [...g.items] }));
   const languages = cv.sections.languages.map((l) => ({ ...l }));
 
   experiences.forEach((e) => {
@@ -239,7 +242,14 @@ async function translateShortFields(cv: GeneratedCV): Promise<GeneratedCV> {
     add(e.degree, (v) => (e.degree = v));
     add(e.field, (v) => (e.field = v));
   });
-  skills_flat.forEach((s, i) => add(s, (v) => (skills_flat[i] = v)));
+  if (skill_groups.length) {
+    skill_groups.forEach((g) => {
+      add(g.label, (v) => (g.label = v));
+      g.items.forEach((s, i) => add(s, (v) => (g.items[i] = v)));
+    });
+  } else {
+    skills_flat.forEach((s, i) => add(s, (v) => (skills_flat[i] = v)));
+  }
   languages.forEach((l) => {
     add(l.name, (v) => (l.name = v));
     add(l.level, (v) => (l.level = v));
@@ -248,7 +258,8 @@ async function translateShortFields(cv: GeneratedCV): Promise<GeneratedCV> {
   if (!items.length) return cv;
   const translated = await translateToEnglish(items, "cv-fields");
   translated.forEach((v, i) => setters[i](v));
-  return { ...cv, sections: { ...cv.sections, experiences, projects, educations, skills_flat, languages } };
+  const flat = skill_groups.length ? skill_groups.flatMap((g) => g.items) : skills_flat;
+  return { ...cv, headline, sections: { ...cv.sections, experiences, projects, educations, skills_flat: flat, skill_groups, languages } };
 }
 
 /** Relit l'objet et les paragraphes de la lettre. */

@@ -4,7 +4,8 @@ import { getOffre } from "@/lib/db/offres";
 import { generateCV } from "@/lib/ai/generate-cv";
 import { generateLM } from "@/lib/ai/generate-lm";
 import { genericFailure, translateAiError } from "@/lib/ai/errors";
-import { fitCVToOnePage, fitLMToOnePage } from "@/lib/pdf/render";
+import { fitLMToOnePage } from "@/lib/pdf/render";
+import { fitAndFillCV } from "@/lib/pdf/fill";
 import { renderCVDocx, renderLMDocx } from "@/lib/docx/render";
 import { saveDocument, offreFolderPath } from "@/lib/db/documents";
 import { detectDocLanguage, sourceLanguageHint } from "@/lib/text/lang";
@@ -19,7 +20,8 @@ export const maxDuration = 180;
  */
 export async function POST(req: NextRequest) {
   try {
-    const { offreId } = await req.json();
+    // Le Word est optionnel (`docx: true`) ; le PDF est toujours généré.
+    const { offreId, docx: wantDocx = false } = await req.json();
     const profile = getProfile();
     if (!profile) return NextResponse.json({ error: "Profil introuvable" }, { status: 400 });
     const offre = getOffre(Number(offreId));
@@ -45,8 +47,8 @@ export async function POST(req: NextRequest) {
     const [cvSettled, lmSettled] = await Promise.allSettled([
       (async () => {
         const initialCV = await generateCV(profile, offre, lang);
-        const { pdf, cv } = await fitCVToOnePage(initialCV, lang);
-        const docx = await renderCVDocx(cv, lang);
+        const { pdf, cv, fontSize } = await fitAndFillCV(initialCV, { profile, offre, lang });
+        const docx = wantDocx ? await renderCVDocx(cv, lang, fontSize) : null;
         const pdfDoc = saveDocument({
           type: "cv",
           offreId: offre.id,
@@ -54,14 +56,8 @@ export async function POST(req: NextRequest) {
           buffer: pdf,
           meta,
         });
-        const docxDoc = saveDocument({
-          type: "cv",
-          offreId: offre.id,
-          format: "docx",
-          buffer: docx,
-          meta,
-        });
-        return { pdfId: pdfDoc.id, docxId: docxDoc.id };
+        const docxDoc = docx ? saveDocument({ type: "cv", offreId: offre.id, format: "docx", buffer: docx, meta }) : null;
+        return { pdfId: pdfDoc.id, docxId: docxDoc?.id ?? null };
       })(),
       (async () => {
         const initialLM = await generateLM(profile, offre, lang);
@@ -72,13 +68,15 @@ export async function POST(req: NextRequest) {
           lm: initialLM,
           language: lang,
         });
-        const docx = await renderLMDocx({
-          identity,
-          company: offre.company,
-          companyLocation: lang === "en" ? countryNameEnglish(offre.country) : offre.country,
-          lm,
-          language: lang,
-        });
+        const docx = wantDocx
+          ? await renderLMDocx({
+              identity,
+              company: offre.company,
+              companyLocation: lang === "en" ? countryNameEnglish(offre.country) : offre.country,
+              lm,
+              language: lang,
+            })
+          : null;
         const pdfDoc = saveDocument({
           type: "lm",
           offreId: offre.id,
@@ -86,14 +84,8 @@ export async function POST(req: NextRequest) {
           buffer: pdf,
           meta,
         });
-        const docxDoc = saveDocument({
-          type: "lm",
-          offreId: offre.id,
-          format: "docx",
-          buffer: docx,
-          meta,
-        });
-        return { pdfId: pdfDoc.id, docxId: docxDoc.id };
+        const docxDoc = docx ? saveDocument({ type: "lm", offreId: offre.id, format: "docx", buffer: docx, meta }) : null;
+        return { pdfId: pdfDoc.id, docxId: docxDoc?.id ?? null };
       })(),
     ]);
 

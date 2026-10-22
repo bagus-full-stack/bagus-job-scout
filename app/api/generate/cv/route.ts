@@ -3,7 +3,7 @@ import { getProfile } from "@/lib/db/queries";
 import { getOffre } from "@/lib/db/offres";
 import { generateCV } from "@/lib/ai/generate-cv";
 import { genericFailure, translateAiError } from "@/lib/ai/errors";
-import { fitCVToOnePage } from "@/lib/pdf/render";
+import { fitAndFillCV } from "@/lib/pdf/fill";
 import { renderCVDocx } from "@/lib/docx/render";
 import { saveDocument } from "@/lib/db/documents";
 import { detectDocLanguage, sourceLanguageHint } from "@/lib/text/lang";
@@ -13,7 +13,8 @@ export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
   try {
-    const { offreId } = await req.json();
+    // Le Word est optionnel (`docx: true`) ; le PDF est toujours généré.
+    const { offreId, docx: wantDocx = false } = await req.json();
     const profile = getProfile();
     if (!profile) return NextResponse.json({ error: "Profil introuvable" }, { status: 400 });
     const offre = getOffre(Number(offreId));
@@ -24,12 +25,12 @@ export async function POST(req: NextRequest) {
     const lang = detectDocLanguage(offre.title, offre.description_text, sourceLanguageHint(offre.source, offre.raw_payload), offre.country);
     const initialCV = await generateCV(profile, offre, lang);
     // Fit to 1 page — returns the (possibly shrunk) cv data + the validated PDF
-    const { pdf, cv } = await fitCVToOnePage(initialCV, lang);
-    const docx = await renderCVDocx(cv, lang); // DOCX uses the SAME shrunk content
+    const { pdf, cv, fontSize } = await fitAndFillCV(initialCV, { profile, offre, lang });
+    const docx = wantDocx ? await renderCVDocx(cv, lang, fontSize) : null; // DOCX uses the SAME shrunk content
 
     const meta = { company: offre.company, title: offre.title };
     const pdfDoc = saveDocument({ type: "cv", offreId: offre.id, format: "pdf", buffer: pdf, meta });
-    saveDocument({ type: "cv", offreId: offre.id, format: "docx", buffer: docx, meta });
+    if (docx) saveDocument({ type: "cv", offreId: offre.id, format: "docx", buffer: docx, meta });
 
     return NextResponse.json({ ok: true, document_id: pdfDoc.id, language: lang });
   } catch (e) {
