@@ -6,6 +6,7 @@ import { sanitizeScrapedOffre } from "@/lib/offres/clean-text";
 import { registerScanForRepairs } from "@/lib/db/repair-markup";
 import { scoreOffresLocal } from "@/lib/scoring/local";
 import { getProfile } from "@/lib/db/queries";
+import { aiRerankTop } from "@/lib/scoring/ai-pass";
 import { getDb } from "@/lib/db";
 import type { ProgressEvent } from "@/lib/scrapers/base";
 
@@ -126,6 +127,19 @@ export async function* runScan(
     onLog(summary);
     flush();
   }
+
+  // Second passage : l'IA affine les meilleures offres. Jamais bloquant pour le scan.
+  try {
+    const r = await aiRerankTop();
+    const line = r.note ? `[ia] ${r.note}` : `[ia] ${r.reranked} offres affinées par l'IA`;
+    log.push(line);
+    onLog(line);
+  } catch (e) {
+    const line = `[ia] second passage échoué : ${e instanceof Error ? e.message : String(e)}`;
+    log.push(line);
+    onLog(line);
+  }
+  flush();
 
   db.prepare("UPDATE scan_runs SET status = 'done', finished_at = datetime('now') WHERE id = ?").run(runId);
   yield { kind: "global-done", total_inserted: totalInserted };

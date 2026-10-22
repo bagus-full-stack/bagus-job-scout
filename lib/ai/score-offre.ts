@@ -3,11 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { callStructured, type StructuredTool } from "./llm";
 import type { ProfileFull } from "@/lib/cv/types";
-import { isAnchoredSkill } from "@/lib/scoring/local";
+import { isAnchoredSkill, yearsOfExperience } from "@/lib/scoring/local";
 
 export type ScoreResult = {
   score: number;
-  breakdown: { sector: number; skills: number; country: number };
+  breakdown: { sector: number; skills: number; title?: number; country: number };
   reason: string;
 };
 
@@ -29,9 +29,10 @@ const SCORE_TOOL = {
               properties: {
                 sector: { type: "number" },
                 skills: { type: "number" },
+                title: { type: "number" },
                 country: { type: "number" },
               },
-              required: ["sector", "skills", "country"],
+              required: ["sector", "skills", "title", "country"],
             },
             reason: { type: "string" },
           },
@@ -56,6 +57,9 @@ function buildProfileSummary(profile: ProfileFull): string {
   return JSON.stringify(
     {
       sectors: profile.sectors,
+      target_titles: profile.target_titles ?? [],
+      preferred_contracts: profile.preferred_contracts,
+      years_of_experience: yearsOfExperience(profile),
       target_countries: profile.target_countries,
       skills_anchored: skillsAnchored.map((s) => s.name),
       skills_listed_only: skillsListed.map((s) => s.name),
@@ -70,7 +74,7 @@ function buildProfileSummary(profile: ProfileFull): string {
 
 export async function scoreOffres(
   profile: ProfileFull,
-  offres: { title: string; company: string; country: string | null; description_text: string }[]
+  offres: { title: string; company: string; country: string | null; description_text: string; contract_type?: string | null }[]
 ): Promise<ScoreResult[]> {
   if (offres.length === 0) return [];
 
@@ -82,6 +86,7 @@ export async function scoreOffres(
     title: o.title,
     company: o.company,
     country: o.country,
+    contract_type: o.contract_type ?? null,
     description: o.description_text.slice(0, 3000),
   }));
 

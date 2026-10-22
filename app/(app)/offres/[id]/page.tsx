@@ -93,7 +93,9 @@ export default async function OffreDetailPage({ params }: { params: Promise<{ id
               <div className="mt-5 space-y-4">
                 <ScoreBar label="Secteur" value={offre.score_breakdown.sector} />
                 <ScoreBar label="Compétences" value={offre.score_breakdown.skills} />
+                {offre.score_breakdown.title != null && <ScoreBar label="Poste" value={offre.score_breakdown.title} />}
                 <ScoreBar label="Pays" value={offre.score_breakdown.country} />
+                {offre.score_breakdown.ai_score != null && <ScoreBar label="Avis IA" value={offre.score_breakdown.ai_score} />}
                 {offre.score_breakdown.language != null && <ScoreBar label="Langue" value={offre.score_breakdown.language} />}
                 {offre.score_breakdown.contract != null && <ScoreBar label="Contrat" value={offre.score_breakdown.contract} />}
                 {offre.score_breakdown.duration != null && offre.score_breakdown.duration > 0 && <ScoreBar label="Durée V.I.E" value={offre.score_breakdown.duration} />}

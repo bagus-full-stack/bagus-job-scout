@@ -35,6 +35,8 @@ export type OffreRow = {
     language?: number;
     duration?: number;
     contract?: number;
+    /** Note de l'IA (second passage) ; le score affiché est la moyenne avec le score local. */
+    ai_score?: number;
     reason?: string;
   } | null;
   is_vie: number;
