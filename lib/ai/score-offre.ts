@@ -92,7 +92,7 @@ export async function scoreOffres(
 
   const message = await callStructured({
     role: "reviewer",
-    maxTokens: 8000,
+    maxTokens: 4000,
     system: [
       { text: getSystemPrompt(), cache: true },
       { text: `<profil_utilisateur>\n${profileSummary}\n</profil_utilisateur>`, cache: true },
