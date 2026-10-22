@@ -1,5 +1,6 @@
 import "server-only";
 import type { Scraper, ScrapedOffre, ScrapeCriteria, ProgressEvent } from "./base";
+import { searchQueries } from "./base";
 import { htmlToText } from "./base";
 import { detectVie } from "@/lib/vie";
 import { nameToCode } from "@/lib/countries";
@@ -198,7 +199,7 @@ export const talentScraper: Scraper = {
     // Budget réparti : ~20 offres par pays, borné par maxOffres global.
     const max = criteria.maxOffres ?? Math.min(150, activeDomains.length * 20);
     const perDomain = Math.max(10, Math.floor(max / activeDomains.length));
-    const queries = criteria.sectors.length ? criteria.sectors : [""];
+    const queries = searchQueries(criteria);
     const seen = new Map<string, Card>();
 
     for (const domain of activeDomains) {

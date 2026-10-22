@@ -1,5 +1,6 @@
 import "server-only";
 import type { Scraper, ScrapedOffre, ScrapeCriteria, ProgressEvent } from "./base";
+import { searchQueries } from "./base";
 import { htmlToText } from "./base";
 import { detectVie } from "@/lib/vie";
 import { normalizeCountryName, nameToCode } from "@/lib/countries";
@@ -169,7 +170,7 @@ export const wttjScraper: Scraper = {
     const targetCodes = new Set(
       criteria.countries.map((c) => nameToCode(c)).filter((c): c is string => !!c)
     );
-    const queries = criteria.sectors.length ? criteria.sectors : [""];
+    const queries = searchQueries(criteria);
 
     // 1. Collecte via l'index : une recherche par secteur cible, 2 pages max.
     const seen = new Map<string, Hit>();

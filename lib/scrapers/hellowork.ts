@@ -1,5 +1,6 @@
 import "server-only";
 import type { Scraper, ScrapedOffre, ScrapeCriteria, ProgressEvent } from "./base";
+import { searchQueries } from "./base";
 import { htmlToText } from "./base";
 import { detectVie } from "@/lib/vie";
 import {
@@ -159,7 +160,7 @@ export const helloworkScraper: Scraper = {
     }
 
     const max = criteria.maxOffres ?? 50;
-    const queries = criteria.sectors.length ? criteria.sectors : [""];
+    const queries = searchQueries(criteria);
     const seen = new Map<string, Card>();
 
     for (const q of queries) {

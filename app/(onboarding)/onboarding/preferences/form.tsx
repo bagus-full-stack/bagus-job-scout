@@ -17,6 +17,7 @@ export function PreferencesForm() {
   const router = useRouter();
   const [profile, setProfile] = useState<ProfileFull | null>(null);
   const [sectorInput, setSectorInput] = useState("");
+  const [titleInput, setTitleInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,6 +52,13 @@ export function PreferencesForm() {
         ? profile.sources_enabled.filter((x) => x !== id)
         : [...profile.sources_enabled, id],
     });
+  };
+
+  const addTitle = () => {
+    const v = titleInput.trim();
+    setTitleInput("");
+    if (!v || (profile.target_titles ?? []).includes(v)) return;
+    update({ target_titles: [...(profile.target_titles ?? []), v] });
   };
 
   const addSector = () => {
@@ -98,6 +106,35 @@ export function PreferencesForm() {
 
   return (
     <div className="space-y-5">
+      <Card>
+        <h2 className="text-h3 mb-1">Postes recherchés</h2>
+        <p className="text-small text-textSecondary mb-4">
+          Intitulés de postes, utilisés pour interroger les sites d&apos;emploi (ex. Développeur full stack).
+        </p>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {(profile.target_titles ?? []).map((t) => (
+            <Chip
+              key={t}
+              active
+              onRemove={() => update({ target_titles: (profile.target_titles ?? []).filter((x) => x !== t) })}
+            >
+              {t}
+            </Chip>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <Input
+            value={titleInput}
+            onChange={(e) => setTitleInput(e.target.value)}
+            placeholder="Ex. Développeur full stack, Ingénieur IA…"
+            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTitle())}
+          />
+          <Button variant="secondary" onClick={addTitle}>
+            <Plus className="h-4 w-4" /> Ajouter
+          </Button>
+        </div>
+      </Card>
+
       <Card>
         <h2 className="text-h3 mb-1">Secteurs cibles</h2>
         <p className="text-small text-textSecondary mb-4">

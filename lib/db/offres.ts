@@ -30,6 +30,7 @@ export type OffreRow = {
   score_breakdown: {
     sector: number;
     skills: number;
+    title?: number;
     country: number;
     language?: number;
     duration?: number;

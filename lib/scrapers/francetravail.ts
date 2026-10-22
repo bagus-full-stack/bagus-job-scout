@@ -1,5 +1,6 @@
 import "server-only";
 import type { Scraper, ScrapedOffre, ScrapeCriteria, ProgressEvent } from "./base";
+import { searchQueries } from "./base";
 import { htmlToText } from "./base";
 import { detectVie } from "@/lib/vie";
 import { snippetToHtml } from "@/lib/text/entities";
@@ -115,13 +116,16 @@ function apiJobToScraped(job: FtApiJob): ScrapedOffre | null {
   };
 }
 
-async function fetchApi(keywords: string, start: number, size: number): Promise<FtApiJob[]> {
+async function fetchApi(keywords: string, start: number, size: number, contracts: string[] = []): Promise<FtApiJob[]> {
   const token = await getToken();
   if (!token) return [];
   const params = new URLSearchParams({
     motsCles: keywords,
     range: `${start}-${start + size - 1}`,
   });
+  // typeContrat de l'API : filtre fiable seulement pour CDI/CDD (VIE, stage, alternance ont d'autres codes).
+  const ftTypes = contracts.filter((c) => c === "cdi" || c === "cdd").map((c) => c.toUpperCase());
+  if (ftTypes.length && ftTypes.length === contracts.length) params.set("typeContrat", ftTypes.join(","));
   const res = await fetch(`${API_BASE}/offres/search?${params}`, {
     headers: { accept: "application/json", authorization: `Bearer ${token}` },
   });
@@ -243,14 +247,14 @@ export const francetravailScraper: Scraper = {
     }
 
     const max = criteria.maxOffres ?? 50;
-    const queries = criteria.sectors.length ? criteria.sectors : [""];
+    const queries = searchQueries(criteria);
 
     // Stratégie 1 : API officielle (descriptions complètes, aucun fetch détail nécessaire)
     const apiOffres = new Map<string, ScrapedOffre>();
     for (const q of queries) {
       let start = 0;
       while (apiOffres.size < max && start < 150) {
-        const jobs = await fetchApi(q, start, 50);
+        const jobs = await fetchApi(q, start, 50, criteria.contracts);
         if (!jobs.length) break;
         for (const j of jobs) {
           const o = apiJobToScraped(j);

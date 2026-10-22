@@ -65,6 +65,8 @@ export const ProfileSchema = z.object({
   summary: z.string().nullable().optional(),
   raw_cv_text: z.string().nullable().optional(),
   sectors: z.array(z.string()).default([]),
+  /** Intitulés de postes recherchés : requêtes de recherche des sources et critère « titre » du score. */
+  target_titles: z.array(z.string()).default([]),
   target_countries: z.array(z.string()).default([]),
   sources_enabled: z.array(z.string()).default([]),
   preferred_contracts: z

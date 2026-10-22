@@ -70,7 +70,12 @@ export async function* runScan(
     const pendingScoring: OrchestratorEvent[] = [];
 
     try {
-      const criteria = { sectors: profile.sectors, countries: profile.target_countries };
+      const criteria = {
+        sectors: profile.sectors,
+        queries: profile.target_titles,
+        contracts: profile.preferred_contracts,
+        countries: profile.target_countries,
+      };
       const progressQueue: ProgressEvent[] = [];
       const onEvent = (e: ProgressEvent) => progressQueue.push(e);
 

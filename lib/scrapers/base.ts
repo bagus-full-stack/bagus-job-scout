@@ -27,6 +27,10 @@ export type ScrapedOffre = {
 
 export type ScrapeCriteria = {
   sectors: string[];
+  /** Requêtes de recherche (intitulés de postes). Repli sur `sectors` si vide. */
+  queries?: string[];
+  /** Contrats recherchés (cdi, cdd, vie, stage, alternance), pour les sources qui savent filtrer. */
+  contracts?: string[];
   countries: string[];
   maxOffres?: number;
 };
@@ -36,6 +40,11 @@ export type ProgressEvent =
   | { kind: "list"; source: string; total: number }
   | { kind: "offre"; source: string; index: number; total: number; status: "ok" | "failed" }
   | { kind: "done"; source: string; seen: number; ok: number; failed: number };
+
+export function searchQueries(c: ScrapeCriteria): string[] {
+  if (c.queries?.length) return c.queries;
+  return c.sectors.length ? c.sectors : [""];
+}
 
 export interface Scraper {
   name: string;

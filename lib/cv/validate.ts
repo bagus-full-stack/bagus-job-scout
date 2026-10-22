@@ -109,6 +109,7 @@ export function buildProfileFromExtraction(
     summary: ex.summary,
     raw_cv_text: rawCvText,
     sectors: [],
+    target_titles: [],
     target_countries: [],
     sources_enabled: [],
     // Même défaut que le schéma zod, la colonne SQL et l'écran de préférences.

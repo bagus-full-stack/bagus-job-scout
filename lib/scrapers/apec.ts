@@ -1,5 +1,6 @@
 import "server-only";
 import type { Scraper, ScrapedOffre, ScrapeCriteria, ProgressEvent } from "./base";
+import { searchQueries } from "./base";
 import { detectVie } from "@/lib/vie";
 import { parseDocument, firstMatchHtml, largestTextBlockHtml, sleep } from "./dom";
 
@@ -162,7 +163,7 @@ export const apecScraper: Scraper = {
     }
 
     const max = criteria.maxOffres ?? 60;
-    const queries = criteria.sectors.length ? criteria.sectors : [""];
+    const queries = searchQueries(criteria);
     const seen = new Map<string, ApecJob>();
 
     for (const q of queries) {

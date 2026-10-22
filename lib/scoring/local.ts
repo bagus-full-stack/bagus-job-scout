@@ -7,6 +7,7 @@ export type ScoreResult = {
   breakdown: {
     sector: number;
     skills: number;
+    title: number;
     country: number;
     language: number;
     duration: number;
@@ -44,6 +45,17 @@ function containsTerm(text: string, term: string): boolean {
   return re.test(text);
 }
 
+/**
+ * Un secteur multi-mots ne matche que si l'expression entière figure dans le texte,
+ * ou au moins 60 % de ses mots (« développement full stack » ne matche plus sur
+ * « développement » seul).
+ */
+function sectorMatches(textNorm: string, sector: string, tokens: string[]): boolean {
+  if (containsTerm(textNorm, sector)) return true;
+  const need = Math.max(1, Math.ceil(tokens.length * 0.6));
+  return tokens.filter((t) => containsTerm(textNorm, t)).length >= need;
+}
+
 function scoreSector(
   sectors: string[],
   title: string,
@@ -58,8 +70,8 @@ function scoreSector(
   for (const sector of sectors) {
     const tokens = tokenize(sector);
     if (!tokens.length) continue;
-    const inTitle = tokens.some((t) => containsTerm(titleNorm, t));
-    const inDesc = tokens.some((t) => containsTerm(descNorm, t));
+    const inTitle = sectorMatches(titleNorm, sector, tokens);
+    const inDesc = sectorMatches(descNorm, sector, tokens);
     if (inTitle) {
       total += 1.0;
       matched.push(sector);
@@ -69,9 +81,7 @@ function scoreSector(
     }
   }
   const best = sectors.length === 0 ? 0 : (total / sectors.length) * 100;
-  const hasTitleMatch = matched.some((s) =>
-    tokenize(s).some((t) => containsTerm(titleNorm, t))
-  );
+  const hasTitleMatch = matched.some((s) => sectorMatches(titleNorm, s, tokenize(s)));
   const score = Math.round(Math.min(100, hasTitleMatch ? Math.max(best, 70) : best));
   return { score, matched };
 }
@@ -111,14 +121,61 @@ function scoreSkills(
     }
   }
 
-  const maxWeight = anchoredSkills.length * 2 + listedSkills.length * 1;
-  if (maxWeight === 0) return { score: 30, matched, anchoredMatched };
+  if (anchoredSkills.length + listedSkills.length === 0) return { score: 30, matched, anchoredMatched };
 
-  const density = weightedHits / maxWeight;
-  const absoluteBoost = Math.min(1, matched.length / 6);
-
-  const score = Math.round(Math.min(100, density * 70 + absoluteBoost * 30));
+  // Rendement décroissant sur le nombre de compétences trouvées : la taille de la liste du
+  // profil ne pénalise plus (avant : ratio trouvées / déclarées, injuste pour un profil riche).
+  const score = Math.round(100 * (1 - Math.exp(-weightedHits / 6)));
   return { score, matched, anchoredMatched };
+}
+
+const SENIOR_RE = /\b(senior|sr|lead|principal|staff|expert|confirme|head of|directeur|director)\b/;
+
+/** Étendue en années entre la plus ancienne date de début et la plus récente de fin ; null si aucune date. */
+export function yearsOfExperience(profile: ProfileFull): number | null {
+  const toMonths = (d: string | null | undefined): number | null => {
+    if (!d) return null;
+    if (d === "present") return new Date().getFullYear() * 12 + new Date().getMonth();
+    const m = /^(\d{4})(?:-(\d{2}))?/.exec(d);
+    return m ? Number(m[1]) * 12 + (m[2] ? Number(m[2]) - 1 : 0) : null;
+  };
+  const starts = profile.experiences.map((e) => toMonths(e.start_date)).filter((n): n is number => n !== null);
+  const ends = profile.experiences
+    .map((e) => toMonths(e.end_date) ?? toMonths(e.start_date))
+    .filter((n): n is number => n !== null);
+  if (!starts.length || !ends.length) return null;
+  return Math.max(0, (Math.max(...ends) - Math.min(...starts)) / 12);
+}
+
+/**
+ * Adéquation du titre de l'offre aux postes recherchés (target_titles), à défaut aux intitulés
+ * des expériences (plafonné à 80). Une offre « senior/lead » est pénalisée si l'expérience
+ * connue est inférieure à 3 ans.
+ */
+export function scoreTitle(profile: ProfileFull, offreTitle: string): { score: number; matched: string | null } {
+  const titleNorm = normalize(offreTitle);
+  const targets = (profile.target_titles ?? []).filter((t) => t.trim());
+  const pool = targets.length ? targets : profile.experiences.map((e) => e.title).filter(Boolean);
+  if (!pool.length) return { score: 50, matched: null };
+
+  let best = 0;
+  let matched: string | null = null;
+  for (const t of pool) {
+    const tokens = tokenize(t);
+    if (!tokens.length) continue;
+    const ratio = containsTerm(titleNorm, t)
+      ? 1
+      : tokens.filter((tok) => containsTerm(titleNorm, tok)).length / tokens.length;
+    if (ratio > best) {
+      best = ratio;
+      matched = t;
+    }
+  }
+  let score = best * 100;
+  if (!targets.length) score = Math.min(score, 80);
+  const years = yearsOfExperience(profile);
+  if (years !== null && years < 3 && SENIOR_RE.test(titleNorm)) score *= 0.6;
+  return { score: Math.round(score), matched: best > 0 ? matched : null };
 }
 
 function scoreCountry(targetCountries: string[], offreCountry: string | null): number {
@@ -274,14 +331,15 @@ export function scoreOffreLocal(
 ): ScoreResult {
   const sector = scoreSector(profile.sectors, offre.title, offre.description_text);
   const skills = scoreSkills(profile, offre.description_text);
+  const title = scoreTitle(profile, offre.title);
   const country = scoreCountry(profile.target_countries, offre.country);
   const language = scoreLanguage(profile.languages, offre.title, offre.description_text);
   const contract = scoreContract(profile.preferred_contracts, offre);
   const duration = scoreDuration(contract.category, offre.description_text);
 
-  // Weighted base, same balance as before (sector 30 / skills 50 / country 20)
+  // Base pondérée : secteur 20 / compétences 40 / titre 20 / pays 20
   const base =
-    sector.score * 0.3 + skills.score * 0.5 + country * 0.2;
+    sector.score * 0.2 + skills.score * 0.4 + title.score * 0.2 + country * 0.2;
 
   // Bonuses on top, capped overall at 100. Tuned so a perfect-base offer
   // (100) stays at 100, and a so-so 60-pts offer can climb to ~73 if it
@@ -303,6 +361,7 @@ export function scoreOffreLocal(
   } else if (skills.matched.length) {
     parts.push(`skills : ${skills.matched.slice(0, 3).join(", ")}`);
   }
+  if (title.matched && title.score >= 60) parts.push(`poste ${title.matched}`);
   if (country === 100) parts.push("pays OK");
   else if (country === 0) parts.push("hors pays cibles");
   if (language.matched) parts.push(`langue ${language.offerLang.toUpperCase()} OK`);
@@ -319,6 +378,7 @@ export function scoreOffreLocal(
     breakdown: {
       sector: sector.score,
       skills: skills.score,
+      title: title.score,
       country,
       language: language.score,
       duration: duration.score,

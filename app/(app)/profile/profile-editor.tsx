@@ -267,6 +267,7 @@ function SearchCard({
   update: (p: Partial<ProfileFull>) => void;
 }) {
   const [sector, setSector] = useState("");
+  const [titleInput, setTitleInput] = useState("");
   const [showCountries, setShowCountries] = useState(false);
 
   const addSector = () => {
@@ -277,6 +278,12 @@ function SearchCard({
     }
     update({ sectors: [...profile.sectors, v] });
     setSector("");
+  };
+  const addTitle = () => {
+    const v = titleInput.trim();
+    setTitleInput("");
+    if (!v || (profile.target_titles ?? []).includes(v)) return;
+    update({ target_titles: [...(profile.target_titles ?? []), v] });
   };
   const toggleCountry = (c: string) => {
     const has = profile.target_countries.includes(c);
@@ -298,6 +305,33 @@ function SearchCard({
   return (
     <Card id="recherche" className="scroll-mt-28">
       <SectionHead icon={<Globe className="h-4 w-4" />} title="Recherche" />
+
+      <p className="text-caption uppercase text-textSecondary mb-2">Postes recherchés</p>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {(profile.target_titles ?? []).map((t) => (
+          <Chip
+            key={t}
+            active
+            onRemove={() => update({ target_titles: (profile.target_titles ?? []).filter((x) => x !== t) })}
+          >
+            {t}
+          </Chip>
+        ))}
+      </div>
+      <div className="flex gap-2 mb-1">
+        <Input
+          value={titleInput}
+          onChange={(e) => setTitleInput(e.target.value)}
+          placeholder="Ex. Développeur full stack, Ingénieur IA…"
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTitle())}
+        />
+        <Button variant="secondary" size="sm" onClick={addTitle}>
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+      <p className="text-caption text-textSecondary mb-4">
+        Intitulés utilisés pour interroger les sites d&apos;emploi et pour noter le titre des offres.
+      </p>
 
       <p className="text-caption uppercase text-textSecondary mb-2">Secteurs</p>
       <div className="flex flex-wrap gap-1.5 mb-2">

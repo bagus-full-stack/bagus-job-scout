@@ -26,6 +26,10 @@ export function getDb(): DatabaseSync {
     );
   } catch {}
 
+  try {
+    db.exec(`ALTER TABLE profile ADD COLUMN target_titles TEXT NOT NULL DEFAULT '[]'`);
+  } catch {}
+
   _db = db;
   return db;
 }
