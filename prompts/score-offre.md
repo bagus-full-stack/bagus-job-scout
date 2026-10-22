@@ -30,6 +30,14 @@ Le score reflète la proportion des compétences **demandées par l'offre** que 
 ### Contrat
 Si `preferred_contracts` ne contient pas le type de contrat de l'offre (`contract_type`), plafonne `score` à 60. Un contrat inconnu ne pénalise pas.
 
+### Calibrage (OBLIGATOIRE : les notes doivent départager les offres)
+Les offres reçues sont déjà toutes bonnes : ton travail est de les CLASSER, pas de les valider.
+- Pars de 60 pour une offre correcte, puis ajuste avec des écarts nets. **90+ est réservé à une offre quasi parfaite** : même métier ET même niveau ET stack quasi identique à `skills_anchored` ET aucun point faible. Au plus 1 offre sur 5 reçoit 90+.
+- Déduis explicitement, avec des écarts francs (-5 à -15 chacun) : technologie principale de l'offre absente du profil ou seulement listée, stack différente (ex. profil Java/Spring et offre Node/PHP), niveau demandé trop haut ou trop bas, domaine métier éloigné, mission floue ou peu technique, poste d'architecte/manager si le candidat vise un poste de développeur.
+- Sur un lot, **deux offres n'ont le même `score` que si elles sont réellement équivalentes**. L'écart entre la meilleure et la moins bonne du lot doit être d'au moins 20 points. Compare les offres entre elles avant de noter.
+- Utilise toute l'échelle et des valeurs variées (pas uniquement des multiples de 5), pour `score` comme pour chaque entrée de `breakdown`.
+- `reason` cite le point décisif : la technologie qui colle ou qui manque, pas un compliment générique.
+
 ### Règles
 - Ne rien inventer : ne juge que sur ce que dit l'offre et ce que contient le profil.
 - `score` est ton jugement global (0-100), pas forcément la moyenne pondérée.

@@ -27,7 +27,10 @@ type Row = {
  * Second passage : l'IA re-note les `limit` meilleures offres du scoring local qu'elle n'a pas
  * encore vues (un seul appel). Ne fait rien si l'IA n'est pas configurée. Coûte des jetons.
  */
-export async function aiRerankTop(limit = AI_PASS_LIMIT): Promise<{ reranked: number; note?: string }> {
+export async function aiRerankTop(
+  limit = AI_PASS_LIMIT,
+  opts: { force?: boolean } = {}
+): Promise<{ reranked: number; note?: string }> {
   if (getLlmConfig().mode === "unset") return { reranked: 0, note: "IA non configurée, second passage ignoré" };
   const profile = getProfile();
   if (!profile) return { reranked: 0, note: "aucun profil" };
@@ -41,7 +44,7 @@ export async function aiRerankTop(limit = AI_PASS_LIMIT): Promise<{ reranked: nu
       )
       .all(limit * 3) as Row[]
   )
-    .filter((r) => parseJson<{ ai_score?: number } | null>(r.score_breakdown, null)?.ai_score == null)
+    .filter((r) => opts.force || parseJson<{ ai_score?: number } | null>(r.score_breakdown, null)?.ai_score == null)
     .slice(0, limit);
   if (!rows.length) return { reranked: 0, note: "meilleures offres déjà affinées" };
 
@@ -53,9 +56,17 @@ export async function aiRerankTop(limit = AI_PASS_LIMIT): Promise<{ reranked: nu
     // Un résultat absent revient en score 0 et raison vide : on garde alors le score local.
     if (!ai || (ai.score === 0 && !ai.reason)) return;
     const local = parseJson<Record<string, unknown>>(r.score_breakdown, {});
+    // Le score local d'origine est conservé : une re-notation ne mélange jamais deux moyennes.
+    const localScore = typeof local.local_score === "number" ? local.local_score : r.score;
     upd.run(
-      blendScores(r.score, ai.score),
-      JSON.stringify({ ...local, ai_score: ai.score, ai_title: ai.breakdown?.title ?? null, reason: ai.reason }),
+      blendScores(localScore, ai.score),
+      JSON.stringify({
+        ...local,
+        local_score: localScore,
+        ai_score: ai.score,
+        ai_title: ai.breakdown?.title ?? null,
+        reason: ai.reason,
+      }),
       r.id
     );
     reranked++;
