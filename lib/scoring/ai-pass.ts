@@ -5,7 +5,7 @@ import { getLlmConfig } from "@/lib/ai/client";
 import { scoreOffres } from "@/lib/ai/score-offre";
 
 /** Nombre d'offres affinées par l'IA à chaque passage (les mieux classées par le scoring local). */
-export const AI_PASS_LIMIT = 20;
+export const AI_PASS_LIMIT = 40;
 
 /** Score final : moyenne du scoring local (mots-clés) et du jugement de l'IA. */
 export function blendScores(local: number, ai: number): number {
