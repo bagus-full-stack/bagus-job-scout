@@ -59,37 +59,38 @@ export type Card = {
   snippet: string;
 };
 
-function parseSearchPage(html: string, domain: Domain): Card[] {
+export function parseSearchPage(html: string, domain: Domain): Card[] {
   const doc = parseDocument(html);
   const out: Card[] = [];
-  for (const container of Array.from(doc.querySelectorAll('[data-testid^="jobcard-container-"]'))) {
+  // Markup actuel (oct. 2026) : <div data-job-id data-new-id><article class="JobCard_card…">.
+  // L'ancien markup (data-testid="jobcard-container-…") reste accepté en repli.
+  for (const container of Array.from(doc.querySelectorAll('[data-job-id]'))) {
     const id = container.getAttribute("data-job-id") ?? "";
     if (!id) continue;
-    const card =
-      container.querySelector('[data-testid="job-card-server"]') ||
-      container.querySelector('[data-testid="job-card-unified"]') ||
-      container.querySelector("article") ||
-      container;
+    const card = container.querySelector("article") || container;
 
     const title = card.querySelector("h2")?.textContent?.trim() ?? "";
     if (!title) continue;
 
     const header = card.querySelector("header") ?? card;
-    // Entreprise + lieu : les <p> courts (hors description longue) juste après le titre.
-    const shortPs = Array.from(header.querySelectorAll("p"))
-      .map((p) => p.textContent?.trim() ?? "")
-      .filter((t) => t.length > 0 && t.length < 80 && !/voir plus|quick apply/i.test(t));
-    let company = shortPs[0] ?? "";
-    let location = shortPs[1] ?? "";
-    // Certaines cartes concatènent "Entreprise • Ville, PAYS" dans un seul élément
-    if (!location && company.includes("•")) {
-      const parts = company.split("•").map((s) => s.trim());
-      company = parts[0] ?? "";
-      location = parts[1] ?? "";
+    let company = card.querySelector('[class*="JobCard_company"]')?.textContent?.trim() ?? "";
+    let location = card.querySelector('[class*="JobCard_location"]')?.textContent?.trim() ?? "";
+    if (!company) {
+      // Ancien markup : les <p> courts juste après le titre.
+      const shortPs = Array.from(header.querySelectorAll("p"))
+        .map((p) => p.textContent?.trim() ?? "")
+        .filter((t) => t.length > 0 && t.length < 80 && !/voir plus|quick apply/i.test(t));
+      company = shortPs[0] ?? "";
+      location = shortPs[1] ?? "";
+      if (!location && company.includes("•")) {
+        const parts = company.split("•").map((s) => s.trim());
+        company = parts[0] ?? "";
+        location = parts[1] ?? "";
+      }
     }
 
     let contract: string | null = null;
-    for (const span of Array.from(header.querySelectorAll("div div span"))) {
+    for (const span of Array.from(card.querySelectorAll('[class*="tagsJob"] span, header div div span'))) {
       const t = span.textContent?.trim() ?? "";
       if (t && !["Quick Apply", "Voir plus"].includes(t)) {
         contract = t;
@@ -97,19 +98,24 @@ function parseSearchPage(html: string, domain: Domain): Card[] {
       }
     }
 
-    let snippet = "";
-    for (const p of Array.from(header.querySelectorAll("p"))) {
-      const t = p.textContent?.trim() ?? "";
-      if (t.length > 50 && !t.slice(0, 20).includes("Voir plus")) {
-        snippet = t.replace(/\.{3}Voir plus$/, "...");
-        break;
+    let snippet = card.querySelector('p[class*="snippet"]')?.textContent?.trim() ?? "";
+    if (!snippet) {
+      for (const p of Array.from(header.querySelectorAll("p"))) {
+        const t = p.textContent?.trim() ?? "";
+        if (t.length > 50 && !t.slice(0, 20).includes("Voir plus")) {
+          snippet = t;
+          break;
+        }
       }
     }
+    snippet = snippet.replace(/\.{3}\s*Voir plus$/, "...");
 
+    // La page /view attend l'identifiant long (data-new-id) quand il existe.
+    const viewId = container.getAttribute("data-new-id") || id;
     const city = location ? location.split(",")[0].trim() : null;
     out.push({
       id,
-      url: `https://${domain.host}/view?id=${id}`,
+      url: `https://${domain.host}/view?id=${viewId}`,
       title,
       company,
       city,
