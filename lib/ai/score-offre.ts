@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { callStructured, type StructuredTool } from "./llm";
 import type { ProfileFull } from "@/lib/cv/types";
+import { isAnchoredSkill } from "@/lib/scoring/local";
 
 export type ScoreResult = {
   score: number;
@@ -50,8 +51,8 @@ function getSystemPrompt(): string {
 }
 
 function buildProfileSummary(profile: ProfileFull): string {
-  const skillsAnchored = profile.skills.filter((s) => s.evidence_experience_ids.length > 0);
-  const skillsListed = profile.skills.filter((s) => s.evidence_experience_ids.length === 0);
+  const skillsAnchored = profile.skills.filter((s) => isAnchoredSkill(profile, s));
+  const skillsListed = profile.skills.filter((s) => !isAnchoredSkill(profile, s));
   return JSON.stringify(
     {
       sectors: profile.sectors,
@@ -59,6 +60,7 @@ function buildProfileSummary(profile: ProfileFull): string {
       skills_anchored: skillsAnchored.map((s) => s.name),
       skills_listed_only: skillsListed.map((s) => s.name),
       experience_titles: profile.experiences.map((e) => e.title).filter(Boolean),
+      project_names: (profile.projects ?? []).map((p) => p.name).filter(Boolean),
       languages: profile.languages.map((l) => `${l.name}${l.level ? ` (${l.level})` : ""}`),
     },
     null,

@@ -11,6 +11,7 @@ export function CleanupButton() {
   const [done, setDone] = useState<{
     experiencesMerged: number;
     educationsMerged: number;
+    projectsMerged?: number;
     skillsRemoved: number;
   } | null>(null);
 
@@ -38,13 +39,14 @@ export function CleanupButton() {
   }
 
   if (done) {
-    const total = done.experiencesMerged + done.educationsMerged + done.skillsRemoved;
+    const projectsMerged = done.projectsMerged ?? 0;
+    const total = done.experiencesMerged + done.educationsMerged + projectsMerged + done.skillsRemoved;
     return (
       <div role="status" className="text-small text-textSecondary inline-flex items-center gap-1.5">
         <Check className="h-4 w-4 text-success" />
         {total === 0
           ? "Aucun doublon trouvé"
-          : `${done.experiencesMerged} expérience${done.experiencesMerged > 1 ? "s" : ""} et ${done.educationsMerged} formation${done.educationsMerged > 1 ? "s" : ""} fusionnée${done.experiencesMerged + done.educationsMerged > 1 ? "s" : ""} · ${done.skillsRemoved} compétence${done.skillsRemoved > 1 ? "s" : ""} en double retirée${done.skillsRemoved > 1 ? "s" : ""}`}
+          : `${done.experiencesMerged} expérience${done.experiencesMerged > 1 ? "s" : ""} et ${done.educationsMerged} formation${done.educationsMerged > 1 ? "s" : ""}${projectsMerged > 0 ? ` et ${projectsMerged} projet${projectsMerged > 1 ? "s" : ""}` : ""} fusionnée${done.experiencesMerged + done.educationsMerged + projectsMerged > 1 ? "s" : ""} · ${done.skillsRemoved} compétence${done.skillsRemoved > 1 ? "s" : ""} en double retirée${done.skillsRemoved > 1 ? "s" : ""}`}
       </div>
     );
   }

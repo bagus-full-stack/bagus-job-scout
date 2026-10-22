@@ -8,6 +8,7 @@ import {
   X,
   Briefcase,
   GraduationCap,
+  FolderGit2,
   Wrench,
   Languages,
   Globe,
@@ -25,7 +26,7 @@ import { cn } from "@/lib/utils";
 import { COUNTRY_GROUPS } from "@/lib/countries";
 import { SOURCES_META } from "@/lib/sources-meta";
 import { EngineNotice } from "@/components/app/engine-notice";
-import type { ProfileFull, Experience, Education, Skill, Language } from "@/lib/cv/types";
+import type { ProfileFull, Experience, Education, Project, Skill, Language } from "@/lib/cv/types";
 
 const SOURCES = SOURCES_META;
 const PROFILE_SECTIONS = [["#identite", "Identité"], ["#recherche", "Recherche"], ["#experiences", "Expériences"], ["#formations", "Formations"], ["#competences", "Compétences"], ["#langues", "Langues"], ["#parametres", "Paramètres"]] as const;
@@ -180,6 +181,7 @@ export function ProfileEditor({ initial }: { initial: ProfileFull }) {
 
         <ExperiencesCard profile={profile} update={update} />
         <EducationsCard profile={profile} update={update} />
+        <ProjectsCard profile={profile} update={update} />
         <SkillsCard profile={profile} update={update} />
         <LanguagesCard profile={profile} update={update} />
       </div>
@@ -851,6 +853,149 @@ function EducationItem({
         </div>
       )}
     </div>
+  );
+}
+
+function ProjectsCard({
+  profile,
+  update,
+}: {
+  profile: ProfileFull;
+  update: (p: Partial<ProfileFull>) => void;
+}) {
+  const projects = profile.projects ?? [];
+  const [openIdx, setOpenIdx] = useState<Set<number>>(new Set());
+  const toggle = (i: number) =>
+    setOpenIdx((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  const patch = (i: number, p: Partial<Project>) => {
+    const list = [...projects];
+    list[i] = { ...list[i], ...p };
+    update({ projects: list });
+  };
+  function remove(i: number) {
+    if (!confirm("Supprimer ce projet ?")) return;
+    update({ projects: projects.filter((_, j) => j !== i) });
+    setOpenIdx(new Set());
+  }
+  function add() {
+    update({
+      projects: [
+        {
+          name: "Nouveau projet",
+          role: null,
+          url: null,
+          start_date: null,
+          end_date: null,
+          description: null,
+          bullet_points: [],
+          skills_used: [],
+        },
+        ...projects,
+      ],
+    });
+    setOpenIdx(new Set([0]));
+  }
+
+  return (
+    <Card id="projets" className="scroll-mt-28 md:col-span-2">
+      <SectionHead
+        icon={<FolderGit2 className="h-4 w-4" />}
+        title={`Projets (${projects.length})`}
+        action={
+          <Button size="sm" onClick={add}>
+            <Plus className="h-4 w-4" /> Ajouter
+          </Button>
+        }
+      />
+      <div className="space-y-2">
+        {projects.length === 0 && (
+          <p className="text-small text-textSecondary py-4 text-center">
+            Aucun projet. Ajoutez vos projets perso, open source ou associatifs : ils seront utilisés dans vos CV.
+          </p>
+        )}
+        {projects.map((pr, i) => (
+          <div key={i} className="border border-border rounded-md overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggle(i)}
+              className="w-full flex items-center gap-3 p-3 hover:bg-surface transition-colors text-left"
+            >
+              <ChevronDown
+                className={cn("h-4 w-4 text-textSecondary shrink-0 transition-transform", openIdx.has(i) && "rotate-180")}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-body font-medium truncate">{pr.name || "Sans titre"}</p>
+                <p className="text-caption text-textSecondary truncate">
+                  {[pr.role, [pr.start_date, pr.end_date].filter(Boolean).join(" – ")].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+            </button>
+            {openIdx.has(i) && (
+              <div className="p-4 pt-2 border-t border-border space-y-3 animate-fadeIn">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Nom du projet">
+                    <Input value={pr.name} onChange={(e) => patch(i, { name: e.target.value })} />
+                  </Field>
+                  <Field label="Rôle">
+                    <Input value={pr.role ?? ""} onChange={(e) => patch(i, { role: e.target.value || null })} />
+                  </Field>
+                  <Field label="Lien (GitHub, démo…)">
+                    <Input value={pr.url ?? ""} onChange={(e) => patch(i, { url: e.target.value || null })} />
+                  </Field>
+                  <Field label="Outils (séparés par des virgules)">
+                    <Input
+                      value={(pr.skills_used ?? []).join(", ")}
+                      onChange={(e) =>
+                        patch(i, { skills_used: e.target.value.split(",").map((t) => t.trim()).filter(Boolean) })
+                      }
+                    />
+                  </Field>
+                  <Field label="Début (YYYY-MM)">
+                    <Input
+                      value={pr.start_date ?? ""}
+                      placeholder="AAAA-MM"
+                      onChange={(e) => patch(i, { start_date: e.target.value || null })}
+                    />
+                  </Field>
+                  <Field label="Fin (YYYY-MM)">
+                    <Input
+                      value={pr.end_date ?? ""}
+                      placeholder="AAAA-MM"
+                      onChange={(e) => patch(i, { end_date: e.target.value || null })}
+                    />
+                  </Field>
+                </div>
+                <Field label="Description">
+                  <Textarea
+                    value={pr.description ?? ""}
+                    rows={2}
+                    onChange={(e) => patch(i, { description: e.target.value || null })}
+                  />
+                </Field>
+                <Field label="Réalisations (une par ligne)">
+                  <Textarea
+                    value={(pr.bullet_points ?? []).join("\n")}
+                    rows={3}
+                    onChange={(e) => patch(i, { bullet_points: e.target.value.split("\n").filter((l) => l.trim()) })}
+                  />
+                </Field>
+                <div className="flex justify-end pt-1">
+                  <Button variant="ghost" size="sm" onClick={() => remove(i)}>
+                    <Trash2 className="h-4 w-4 text-danger" />
+                    Supprimer ce projet
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 

@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { ProfileFull } from "@/lib/cv/types";
+import type { ProfileFull, Project } from "@/lib/cv/types";
 
-type Section = "identity" | "experiences" | "educations" | "skills" | "languages";
+type Section = "identity" | "experiences" | "educations" | "projects" | "skills" | "languages";
 
 export function VerifyForm() {
   const router = useRouter();
@@ -18,6 +18,7 @@ export function VerifyForm() {
     identity: true,
     experiences: true,
     educations: false,
+    projects: false,
     skills: false,
     languages: false,
   });
@@ -34,6 +35,12 @@ export function VerifyForm() {
   if (!profile) return null;
 
   const update = (patch: Partial<ProfileFull>) => setProfile({ ...profile, ...patch });
+  const projects = profile.projects ?? [];
+  const patchProject = (i: number, p: Partial<Project>) => {
+    const list = [...projects];
+    list[i] = { ...list[i], ...p };
+    update({ projects: list });
+  };
   const toggle = (s: Section) => setOpen((o) => ({ ...o, [s]: !o[s] }));
 
   function next() {
@@ -327,6 +334,68 @@ export function VerifyForm() {
             }
           >
             <Plus className="h-4 w-4" /> Ajouter une formation
+          </Button>
+        </div>
+      </SectionCard>
+
+      {/* Projects */}
+      <SectionCard
+        title={`Projets (${projects.length})`}
+        open={open.projects}
+        onToggle={() => toggle("projects")}
+        badge="ok"
+      >
+        <div className="space-y-4">
+          {projects.map((pr, i) => (
+            <div key={i} className="border border-border rounded-md p-4">
+              <div className="flex items-start gap-2">
+                <div className="flex-1 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Nom du projet">
+                      <Input value={pr.name} onChange={(ev) => patchProject(i, { name: ev.target.value })} />
+                    </Field>
+                    <Field label="Rôle">
+                      <Input value={pr.role ?? ""} onChange={(ev) => patchProject(i, { role: ev.target.value || null })} />
+                    </Field>
+                    <Field label="Lien (GitHub, démo…)">
+                      <Input value={pr.url ?? ""} onChange={(ev) => patchProject(i, { url: ev.target.value || null })} />
+                    </Field>
+                    <Field label="Outils (séparés par des virgules)">
+                      <Input
+                        value={(pr.skills_used ?? []).join(", ")}
+                        onChange={(ev) =>
+                          patchProject(i, { skills_used: ev.target.value.split(",").map((t) => t.trim()).filter(Boolean) })
+                        }
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Réalisations (une par ligne)">
+                    <Textarea
+                      rows={3}
+                      value={(pr.bullet_points ?? []).join("\n")}
+                      onChange={(ev) => patchProject(i, { bullet_points: ev.target.value.split("\n").filter((l) => l.trim()) })}
+                    />
+                  </Field>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => update({ projects: projects.filter((_, j) => j !== i) })}>
+                  <Trash2 className="h-4 w-4 text-textSecondary" />
+                </Button>
+              </div>
+            </div>
+          ))}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() =>
+              update({
+                projects: [
+                  ...projects,
+                  { name: "", role: null, url: null, start_date: null, end_date: null, description: null, bullet_points: [], skills_used: [] },
+                ],
+              })
+            }
+          >
+            <Plus className="h-4 w-4" /> Ajouter un projet
           </Button>
         </div>
       </SectionCard>

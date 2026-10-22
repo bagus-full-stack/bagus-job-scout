@@ -43,6 +43,8 @@ export type GeneratedCV = {
     projects: {
       name: string;
       role: string | null;
+      /** Posé par validateCVAgainstProfile depuis le profil, jamais fourni par le modèle. */
+      url?: string | null;
       start_date: string | null;
       end_date: string | null;
       bullet_points: string[];
@@ -105,7 +107,7 @@ const TOOL = {
           projects: {
             type: "array",
             description:
-              "Projets personnels ou entrepreneuriaux (création d'entreprise, association, projet bénévole…) — JAMAIS dans experiences. Section rendue APRÈS les expériences salariées. 0 ou 1 projet, 2-3 puces.",
+              "Projets personnels ou entrepreneuriaux (création d'entreprise, association, projet bénévole…) — JAMAIS dans experiences. Section rendue APRÈS les expériences salariées. 0 à 3 projets, choisis parmi ceux du profil les plus pertinents pour l'offre, 2-3 puces chacun.",
             items: {
               type: "object",
               properties: {
@@ -159,7 +161,7 @@ export async function generateCV(
   // anti-hallucination reconnaisse les compétences traduites par le modèle.
   const vocab =
     lang === "en"
-      ? [...new Set([...profile.skills.map((s) => s.name), ...profile.experiences.flatMap((e) => e.skills_used ?? [])].filter(Boolean))]
+      ? [...new Set([...profile.skills.map((s) => s.name), ...profile.experiences.flatMap((e) => e.skills_used ?? []), ...(profile.projects ?? []).flatMap((pr) => pr.skills_used ?? [])].filter(Boolean))]
       : [];
   const vocabPromise = vocab.length ? translateToEnglish(vocab, "profile-skills") : null;
   // Levier cache (même motif que score-offre.ts) : le profil vit dans un
@@ -229,8 +231,8 @@ function enforceAtsLimits(cv: GeneratedCV): GeneratedCV {
 
   // Cap skills_flat at 25 to keep one line at the bottom of the page
   const skills_flat = (cv.sections.skills_flat ?? []).slice(0, 25);
-  // Projet personnel : au plus un, 3 puces — il ne doit jamais évincer une expérience salariée.
-  const projects = (cv.sections.projects ?? []).slice(0, 1).map((p) => ({
+  // Projets personnels : au plus trois, 3 puces chacun — il ne doit jamais évincer une expérience salariée.
+  const projects = (cv.sections.projects ?? []).slice(0, 3).map((p) => ({
     ...p,
     bullet_points: (p.bullet_points ?? []).slice(0, 3),
   }));
@@ -270,6 +272,16 @@ function stripIds(p: ProfileFull) {
       skills_used: e.skills_used,
     })),
     educations: p.educations,
+    projects: (p.projects ?? []).map((pr) => ({
+      name: pr.name,
+      role: pr.role,
+      url: pr.url,
+      start_date: pr.start_date,
+      end_date: pr.end_date,
+      description: pr.description,
+      bullet_points: pr.bullet_points,
+      skills_used: pr.skills_used,
+    })),
     skills: p.skills.map((s) => ({
       name: s.name,
       category: s.category,

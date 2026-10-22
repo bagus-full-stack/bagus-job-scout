@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import type { ProfileFull, Experience, Education, Skill, Language } from "@/lib/cv/types";
+import type { ProfileFull, Experience, Education, Project, Skill, Language } from "@/lib/cv/types";
 
 const ACCEPT = ".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg";
 
@@ -16,6 +16,7 @@ type Plan = {
   enrichedExperiences: { title: string; company: string | null | undefined; newBullets: string[]; newSkills: string[] }[];
   newEducations: Education[];
   enrichedEducations: { school: string; degree: string | null | undefined; newBullets: string[] }[];
+  newProjects: Project[];
   newSkills: Skill[];
   newLanguages: Language[];
   duplicates: { skills: number; languages: number };
@@ -26,6 +27,7 @@ type Added = {
   enrichedExperiences: number;
   newEducations: number;
   enrichedEducations: number;
+  newProjects: number;
   newSkills: number;
   newLanguages: number;
 };
@@ -112,6 +114,7 @@ export function AddCVFlow() {
       done.enrichedExperiences +
       done.newEducations +
       done.enrichedEducations +
+      done.newProjects +
       done.newSkills +
       done.newLanguages;
     return (
@@ -125,6 +128,7 @@ export function AddCVFlow() {
           {done.enrichedExperiences > 0 && <p>{done.enrichedExperiences} expérience{done.enrichedExperiences > 1 ? "s" : ""} enrichie{done.enrichedExperiences > 1 ? "s" : ""} (missions ajoutées)</p>}
           {done.newEducations > 0 && <p>+ {done.newEducations} nouvelle{done.newEducations > 1 ? "s" : ""} formation{done.newEducations > 1 ? "s" : ""}</p>}
           {done.enrichedEducations > 0 && <p>{done.enrichedEducations} formation{done.enrichedEducations > 1 ? "s" : ""} enrichie{done.enrichedEducations > 1 ? "s" : ""}</p>}
+          {done.newProjects > 0 && <p>+ {done.newProjects} nouveau{done.newProjects > 1 ? "x" : ""} projet{done.newProjects > 1 ? "s" : ""}</p>}
           {done.newSkills > 0 && <p>+ {done.newSkills} nouvelle{done.newSkills > 1 ? "s" : ""} compétence{done.newSkills > 1 ? "s" : ""}</p>}
           {done.newLanguages > 0 && <p>+ {done.newLanguages} nouvelle{done.newLanguages > 1 ? "s" : ""} langue{done.newLanguages > 1 ? "s" : ""}</p>}
           {total === 0 && <p>Aucun ajout — ce CV ne contenait que des informations déjà présentes.</p>}
@@ -144,6 +148,7 @@ export function AddCVFlow() {
     const totalNew =
       plan.newExperiences.length +
       plan.newEducations.length +
+      plan.newProjects.length +
       plan.newSkills.length +
       plan.newLanguages.length;
     const totalEnriched =
@@ -247,6 +252,17 @@ export function AddCVFlow() {
                   items={plan.newEducations.map((e) => ({
                     primary: [e.degree, e.field].filter(Boolean).join(" — ") || e.school,
                     secondary: [e.school, e.start_date, e.end_date].filter(Boolean).join(" · "),
+                  }))}
+                />
+              )}
+
+              {plan.newProjects.length > 0 && (
+                <DiffSection
+                  title={`Nouveaux projets (${plan.newProjects.length})`}
+                  variant="new"
+                  items={plan.newProjects.map((p) => ({
+                    primary: p.name,
+                    secondary: [p.role, p.start_date, p.end_date].filter(Boolean).join(" · "),
                   }))}
                 />
               )}

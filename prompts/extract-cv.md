@@ -34,6 +34,8 @@ Tu es un expert en extraction de données structurées à partir de CV (curricul
    - `linkedin_url` / `portfolio_url` : URL complètes (préfixe https:// si manquant)
    - `location` : ville, pays, ou "ville, pays"
 
+7bis. **Projets** : chaque projet personnel, open source, associatif, bénévole ou entrepreneurial (section « Projets », liens GitHub, hackathons…) = une entrée de `projects`, JAMAIS dans `experiences`. Un poste salarié, un stage ou une alternance reste dans `experiences`. `url` = lien écrit dans le CV uniquement. `skills_used` = outils explicitement cités pour CE projet (et ajoute-les aussi à `skills`).
+
 7. **Formations** : chaque diplôme/programme = une entrée. `degree` = type (Master, BSc, BTS), `field` = spécialité (Informatique, Marketing).
 
 8. **Langues** : niveau au format CECRL si possible (A1-C2), sinon texte libre ("courant", "natif", "B2").

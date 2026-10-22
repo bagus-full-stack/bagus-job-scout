@@ -1,5 +1,5 @@
 import "server-only";
-import type { ProfileFull, Experience, Education, Skill, Language } from "./types";
+import type { ProfileFull, Experience, Education, Project, Skill, Language } from "./types";
 import {
   normalizeStr,
   strSim,
@@ -77,6 +77,11 @@ export function isSameEducation(a: Education, b: Education): boolean {
   return datesOverlap(a, b);
 }
 
+/** Même projet : noms proches (Jaccard ≥ 0.7). */
+export function isSameProject(a: Project, b: Project): boolean {
+  return strSim(a.name, b.name) >= 0.7;
+}
+
 // =============================================================
 // Merge two records into one (enrichment)
 // =============================================================
@@ -87,6 +92,20 @@ export function mergeExperience(a: Experience, b: Experience): Experience {
     title: pickLonger(a.title, b.title) ?? a.title,
     company: pickLonger(a.company ?? "", b.company ?? ""),
     location: pickLonger(a.location ?? "", b.location ?? ""),
+    start_date: pickEarliestDate(a.start_date, b.start_date),
+    end_date: pickLatestDate(a.end_date, b.end_date),
+    description: pickLonger(a.description ?? "", b.description ?? ""),
+    bullet_points: mergeBullets(a.bullet_points ?? [], b.bullet_points ?? []),
+    skills_used: mergeStrings(a.skills_used ?? [], b.skills_used ?? []),
+  };
+}
+
+export function mergeProject(a: Project, b: Project): Project {
+  return {
+    ...a,
+    name: pickLonger(a.name, b.name) ?? a.name,
+    role: pickLonger(a.role ?? "", b.role ?? ""),
+    url: a.url || b.url || null,
     start_date: pickEarliestDate(a.start_date, b.start_date),
     end_date: pickLatestDate(a.end_date, b.end_date),
     description: pickLonger(a.description ?? "", b.description ?? ""),
@@ -131,6 +150,8 @@ export type MergePlan = {
   enrichedExperiences: EnrichedExp[];
   newEducations: Education[];
   enrichedEducations: EnrichedEdu[];
+  newProjects: Project[];
+  enrichedProjects: { index: number; before: Project; after: Project }[];
   newSkills: Skill[];
   newLanguages: Language[];
   duplicates: {
@@ -148,6 +169,8 @@ export function planMerge(current: ProfileFull, incoming: ProfileFull): MergePla
     enrichedExperiences: [],
     newEducations: [],
     enrichedEducations: [],
+    newProjects: [],
+    enrichedProjects: [],
     newSkills: [],
     newLanguages: [],
     duplicates: { skills: 0, languages: 0 },
@@ -204,6 +227,20 @@ export function planMerge(current: ProfileFull, incoming: ProfileFull): MergePla
     }
   }
 
+  const curProjects = current.projects ?? [];
+  for (const inc of incoming.projects ?? []) {
+    const idx = curProjects.findIndex((cur) => isSameProject(cur, inc));
+    if (idx === -1) {
+      plan.newProjects.push(inc);
+    } else {
+      const before = curProjects[idx];
+      const after = mergeProject(before, inc);
+      if (JSON.stringify(after) !== JSON.stringify(before)) {
+        plan.enrichedProjects.push({ index: idx, before, after });
+      }
+    }
+  }
+
   // Skills: dedupe by normalized name
   const skillSeen = new Set(current.skills.map(skillKey));
   for (const s of incoming.skills) {
@@ -244,6 +281,10 @@ export function applyMerge(current: ProfileFull, plan: MergePlan): ProfileFull {
   for (const enr of plan.enrichedEducations) educations[enr.index] = enr.after;
   educations.push(...plan.newEducations);
 
+  const projects = [...(current.projects ?? [])];
+  for (const enr of plan.enrichedProjects) projects[enr.index] = enr.after;
+  projects.push(...plan.newProjects);
+
   const skills = [...current.skills, ...plan.newSkills];
 
   const languages = [...current.languages];
@@ -253,6 +294,7 @@ export function applyMerge(current: ProfileFull, plan: MergePlan): ProfileFull {
     ...current,
     experiences,
     educations,
+    projects,
     skills,
     languages,
   };
@@ -303,6 +345,7 @@ export function diffProfile(current: ProfileFull, incoming: ProfileFull): MergeD
 export type CleanupReport = {
   experiencesMerged: number;
   educationsMerged: number;
+  projectsMerged: number;
   skillsRemoved: number;
 };
 
@@ -314,6 +357,7 @@ export function dedupProfile(profile: ProfileFull): { profile: ProfileFull; repo
   const report: CleanupReport = {
     experiencesMerged: 0,
     educationsMerged: 0,
+    projectsMerged: 0,
     skillsRemoved: 0,
   };
 
@@ -341,6 +385,17 @@ export function dedupProfile(profile: ProfileFull): { profile: ProfileFull; repo
     else {
       edu[idx] = mergeEducation(edu[idx], e);
       report.educationsMerged++;
+    }
+  }
+
+  // Projects
+  const projects: Project[] = [];
+  for (const p of profile.projects ?? []) {
+    const idx = projects.findIndex((existing) => isSameProject(existing, p));
+    if (idx === -1) projects.push(p);
+    else {
+      projects[idx] = mergeProject(projects[idx], p);
+      report.projectsMerged++;
     }
   }
 
@@ -381,6 +436,7 @@ export function dedupProfile(profile: ProfileFull): { profile: ProfileFull; repo
       ...profile,
       experiences: exp,
       educations: edu,
+      projects,
       skills,
       languages,
     },

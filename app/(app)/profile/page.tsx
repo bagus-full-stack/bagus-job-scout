@@ -35,9 +35,10 @@ export default async function ProfilePage() {
         }
       />
 
-      <div className="glass-panel mb-8 grid grid-cols-3 divide-x divide-border py-5 text-center sm:py-6">
+      <div className="glass-panel mb-8 grid grid-cols-4 divide-x divide-border py-5 text-center sm:py-6">
         <div><p className="font-display text-[27px] font-semibold tabular-nums">{profile.experiences.length}</p><p className="text-small text-textSecondary">Expériences</p></div>
         <div><p className="font-display text-[27px] font-semibold tabular-nums">{profile.educations.length}</p><p className="text-small text-textSecondary">Formations</p></div>
+        <div><p className="font-display text-[27px] font-semibold tabular-nums">{(profile.projects ?? []).length}</p><p className="text-small text-textSecondary">Projets</p></div>
         <div><p className="font-display text-[27px] font-semibold tabular-nums">{profile.skills.length}</p><p className="text-small text-textSecondary">Compétences</p></div>
       </div>
 

@@ -65,6 +65,14 @@ export function buildProfileFromExtraction(
     }
   }
 
+  // Les outils des projets comptent aussi comme compétences déclarées.
+  for (const p of ex.projects) {
+    for (const skill of p.skills_used ?? []) {
+      const key = skill.trim().toLowerCase();
+      if (key && !skillMap.has(key)) skillMap.set(key, { name: skill.trim(), category: null, level: null, evidence: [] });
+    }
+  }
+
   const skills = Array.from(skillMap.values()).map((s) => ({
     name: s.name,
     category: s.category,
@@ -108,6 +116,7 @@ export function buildProfileFromExtraction(
     extraction_confidence: computeConfidence(ex),
     experiences: expCleaned,
     educations,
+    projects: ex.projects.map((p) => ({ ...p, url: normalizeUrl(p.url) })),
     skills,
     languages: Array.from(langMap.values()),
   };

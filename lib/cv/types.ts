@@ -25,6 +25,19 @@ export const EducationSchema = z.object({
 });
 export type Education = z.infer<typeof EducationSchema>;
 
+export const ProjectSchema = z.object({
+  id: z.number().optional(),
+  name: z.string().min(1),
+  role: z.string().nullable().optional(),
+  url: z.string().nullable().optional(),
+  start_date: z.string().nullable().optional(),
+  end_date: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  bullet_points: z.array(z.string()).default([]),
+  skills_used: z.array(z.string()).default([]),
+});
+export type Project = z.infer<typeof ProjectSchema>;
+
 export const SkillSchema = z.object({
   id: z.number().optional(),
   name: z.string().min(1),
@@ -66,6 +79,7 @@ export type Profile = z.infer<typeof ProfileSchema>;
 export const ProfileFullSchema = ProfileSchema.extend({
   experiences: z.array(ExperienceSchema).default([]),
   educations: z.array(EducationSchema).default([]),
+  projects: z.array(ProjectSchema).default([]),
   skills: z.array(SkillSchema).default([]),
   languages: z.array(LanguageSchema).default([]),
 });
@@ -105,6 +119,20 @@ export const ExtractedCVSchema = z.object({
       description: z.string().nullable(),
     })
   ),
+  projects: z
+    .array(
+      z.object({
+        name: z.string(),
+        role: z.string().nullable(),
+        url: z.string().nullable(),
+        start_date: z.string().nullable(),
+        end_date: z.string().nullable(),
+        description: z.string().nullable(),
+        bullet_points: z.array(z.string()).default([]),
+        skills_used: z.array(z.string()).default([]),
+      })
+    )
+    .default([]),
   skills: z.array(
     z.object({
       name: z.string(),

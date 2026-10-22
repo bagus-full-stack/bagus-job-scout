@@ -19,6 +19,15 @@ export function profileFacts(profile: ProfileFull): string {
     for (const b of e.bullet_points ?? []) lines.push(`  • ${b}`);
     if (e.skills_used?.length) lines.push(`  Outils/plateformes de CETTE expérience : ${e.skills_used.join(", ")}`);
   }
+  if (profile.projects?.length) {
+    lines.push("Projets personnels (source autorisée, comme les expériences) :");
+    for (const p of profile.projects) {
+      lines.push(`- ${p.name}${p.role ? ` — ${p.role}` : ""} (${p.start_date ?? "?"} → ${p.end_date ?? "?"})`);
+      if (p.description) lines.push(`  Description : ${p.description}`);
+      for (const b of p.bullet_points ?? []) lines.push(`  • ${b}`);
+      if (p.skills_used?.length) lines.push(`  Outils de CE projet : ${p.skills_used.join(", ")}`);
+    }
+  }
   lines.push("Formations :");
   for (const ed of profile.educations) {
     lines.push(

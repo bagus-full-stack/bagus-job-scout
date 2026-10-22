@@ -12,7 +12,7 @@ Le titre et la description de l'offre correspondent-ils aux secteurs ciblés par
 ### Critère 2 — Compétences avec corrélation (50%)
 Pour chaque compétence demandée par l'offre, vérifie :
 1. Si elle est listée dans `skills` du profil → +
-2. Si elle est ANCRÉE dans une `experiences[].skills_used` (preuve d'usage réel) → ++
+2. Si elle est ANCRÉE dans une `experiences[].skills_used` ou dans un projet du profil (`project_names`) (preuve d'usage réel) → ++
 
 Le score critère 2 reflète la proportion de compétences demandées qui sont à la fois listées ET ancrées.
 Une compétence listée mais sans expérience attache vaut moins qu'une compétence ancrée.

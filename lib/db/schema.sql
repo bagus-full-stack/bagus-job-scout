@@ -49,6 +49,21 @@ CREATE TABLE IF NOT EXISTS educations (
   FOREIGN KEY (profile_id) REFERENCES profile(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS projects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  profile_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  role TEXT,
+  url TEXT,
+  start_date TEXT,
+  end_date TEXT,
+  description TEXT,
+  bullet_points TEXT NOT NULL DEFAULT '[]',
+  skills_used TEXT NOT NULL DEFAULT '[]',
+  position_index INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (profile_id) REFERENCES profile(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS skills (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   profile_id INTEGER NOT NULL,

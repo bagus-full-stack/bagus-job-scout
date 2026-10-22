@@ -86,6 +86,11 @@ function buildUserPrompt(profile: ProfileFull, offre: OffreFiltered, lang: DocLa
     )
     .join(" ; ");
 
+  const projSummary = (profile.projects ?? [])
+    .slice(0, 3)
+    .map((p) => `${p.name}${p.role ? ` — ${p.role}` : ""}${p.skills_used?.length ? ` (${p.skills_used.join(", ")})` : ""}`)
+    .join(" ; ");
+
   const skillsAnchored = profile.skills
     .filter((s) => s.evidence_experience_ids.length > 0)
     .map((s) => s.name)
@@ -106,6 +111,7 @@ function buildUserPrompt(profile: ProfileFull, offre: OffreFiltered, lang: DocLa
 Nom: ${profile.full_name ?? ""}
 Formation: ${eduSummary || "(non renseignée)"}
 Expériences récentes: ${expSummary || "(aucune)"}
+Projets: ${projSummary || "(aucun)"}
 Compétences ancrées (utilisées en mission): ${
     skillsAnchored.join(", ") || "(aucune)"
   }

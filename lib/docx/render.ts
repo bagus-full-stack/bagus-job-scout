@@ -118,7 +118,7 @@ export async function renderCVDocx(cv: GeneratedCV, language: DocLang = "fr"): P
     children.push(sectionTitle(projects.length > 1 ? L.projects : L.project));
     for (const p of projects) {
       children.push(
-        headerLine(p.role ? `${p.name} — ${p.role}` : p.name, expDateRange(p.start_date, p.end_date, language))
+        headerLine(p.role ? `${p.name} — ${p.role}` : p.name, expDateRange(p.start_date, p.end_date, language), displayUrl(p.url))
       );
       children.push(...bulletParagraphs(p.bullet_points ?? [], ty));
     }

@@ -85,6 +85,25 @@ const EXTRACT_TOOL = {
           ],
         },
       },
+      projects: {
+        type: "array",
+        description:
+          "Projets personnels, open source, associatifs ou entrepreneuriaux listés dans le CV (hors expériences salariées)",
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            role: { type: ["string", "null"] },
+            url: { type: ["string", "null"], description: "Lien GitHub / démo / site, seulement s'il est écrit" },
+            start_date: { type: ["string", "null"] },
+            end_date: { type: ["string", "null"] },
+            description: { type: ["string", "null"] },
+            bullet_points: { type: "array", items: { type: "string" } },
+            skills_used: { type: "array", items: { type: "string" } },
+          },
+          required: ["name", "role", "url", "start_date", "end_date", "description", "bullet_points", "skills_used"],
+        },
+      },
       skills: {
         type: "array",
         items: {
@@ -127,7 +146,7 @@ const EXTRACT_TOOL = {
         },
       },
     },
-    required: ["identity", "summary", "experiences", "educations", "skills", "languages", "certifications"],
+    required: ["identity", "summary", "experiences", "educations", "projects", "skills", "languages", "certifications"],
   },
 } as const;
 

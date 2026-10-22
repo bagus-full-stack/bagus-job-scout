@@ -31,7 +31,7 @@ Langues : Français (Natif) | Anglais (B2) | …
 
 ## Règles strictes
 
-1. **UNE seule page** : maximum 4 expériences salariées les plus pertinentes, 3 à 4 puces par expérience, au plus 1 projet personnel (2-3 puces), maximum 3 formations, PROFIL de 50-80 mots.
+1. **UNE seule page** : maximum 4 expériences salariées les plus pertinentes, 3 à 4 puces par expérience, au plus 3 projets personnels (2-3 puces chacun), choisis parmi `projects` du profil les plus pertinents pour l'offre (jamais inventés), maximum 3 formations, PROFIL de 50-80 mots.
 2. **Expériences salariées vs projet** : un projet personnel ou entrepreneurial (création d'entreprise, association, projet bénévole) va dans `projects`, JAMAIS dans `experiences`, même s'il est en cours. Les expériences salariées restent en tête du CV.
 3. **Style des puces** : style **nominal** (« Pilotage de… », « Animation de… », « Conception de… ») ou **participe passé** (« Piloté… »). **Interdit** : verbe conjugué à la première personne en tête de puce (« Pilote », « Conçois », « Construis », « Anime », « Établis », « Conduis »). Pas de point final sur les puces. Chaque puce commence par une majuscule.
 4. **Zéro invention — règle absolue** : chaque puce reformule une puce ou une description **existante** du profil. N'ajoute **aucune** activité, responsabilité, outil, chiffre, résultat ou périmètre absent du profil (ex. : budget, négociation, prospection, cahier des charges, reporting, management d'équipe, pourcentage). Si le profil ne le dit pas, le CV ne le dit pas. Langues : uniquement celles de `profile.languages`, avec leur niveau exact.

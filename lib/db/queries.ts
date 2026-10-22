@@ -1,6 +1,6 @@
 import "server-only";
 import { getDb, parseJson, asJson, transaction } from "./index";
-import type { ProfileFull, Profile, Experience, Education, Skill, Language } from "@/lib/cv/types";
+import type { ProfileFull, Profile, Experience, Education, Project, Skill, Language } from "@/lib/cv/types";
 
 export function getProfile(): ProfileFull | null {
   const db = getDb();
@@ -31,6 +31,12 @@ export function getProfile(): ProfileFull | null {
       .prepare("SELECT * FROM educations WHERE profile_id = ? ORDER BY position_index ASC")
       .all(id) as Education[]
   ).map((e) => ({ ...e }));
+  const projects = db
+    .prepare("SELECT * FROM projects WHERE profile_id = ? ORDER BY position_index ASC")
+    .all(id) as (Omit<Project, "bullet_points" | "skills_used"> & {
+    bullet_points: string;
+    skills_used: string;
+  })[];
   const skills = db
     .prepare("SELECT * FROM skills WHERE profile_id = ?")
     .all(id) as (Omit<Skill, "evidence_experience_ids"> & { evidence_experience_ids: string })[];
@@ -50,6 +56,11 @@ export function getProfile(): ProfileFull | null {
       skills_used: parseJson(e.skills_used, []),
     })),
     educations,
+    projects: projects.map((p) => ({
+      ...p,
+      bullet_points: parseJson(p.bullet_points, []),
+      skills_used: parseJson(p.skills_used, []),
+    })),
     skills: skills.map((s) => ({
       ...s,
       evidence_experience_ids: parseJson(s.evidence_experience_ids, []),
@@ -117,6 +128,25 @@ export function saveProfile(input: Omit<ProfileFull, "id" | "created_at" | "upda
         e.start_date ?? null,
         e.end_date ?? null,
         e.description ?? null,
+        i
+      )
+    );
+
+    const insProj = db.prepare(
+      `INSERT INTO projects (profile_id, name, role, url, start_date, end_date, description, bullet_points, skills_used, position_index)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    (input.projects ?? []).forEach((p, i) =>
+      insProj.run(
+        profileId,
+        p.name,
+        p.role ?? null,
+        p.url ?? null,
+        p.start_date ?? null,
+        p.end_date ?? null,
+        p.description ?? null,
+        asJson(p.bullet_points ?? []),
+        asJson(p.skills_used ?? []),
         i
       )
     );

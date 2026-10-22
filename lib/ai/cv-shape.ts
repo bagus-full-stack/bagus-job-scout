@@ -36,6 +36,7 @@ const educationSchema = z.object({
 const projectSchema = z.object({
   name: z.string(),
   role: nullableText,
+  url: nullableText.optional(),
   start_date: nullableText,
   end_date: nullableText,
   bullet_points: bullets,

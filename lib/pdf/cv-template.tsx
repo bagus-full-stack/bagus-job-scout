@@ -138,7 +138,7 @@ export function CVDocument({ cv, language = "fr" }: { cv: GeneratedCV; language?
                     {p.role ? ` — ${p.role}` : ""}
                   </Text>
                   <Text style={cvStyles.expDates}>
-                    {`  |  ${expDateRange(p.start_date, p.end_date, language)}`}
+                    {`  |  ${[expDateRange(p.start_date, p.end_date, language), displayUrl(p.url)].filter(Boolean).join("  |  ")}`}
                   </Text>
                 </Text>
                 <Bullets items={p.bullet_points ?? []} ty={ty} />

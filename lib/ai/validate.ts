@@ -75,6 +75,11 @@ export function validateCVAgainstProfile(
   for (const extra of opts.extraKnownSkills ?? []) {
     if (extra) knownSkills.add(normalize(extra));
   }
+  for (const pr of profile.projects ?? []) {
+    for (const su of pr.skills_used ?? []) {
+      if (su) knownSkills.add(normalize(su));
+    }
+  }
   // Education school names also count as legitimate proper nouns to keep
   for (const edu of profile.educations) {
     if (edu.school) knownCompanies.add(normalize(edu.school));
@@ -161,11 +166,27 @@ export function validateCVAgainstProfile(
     );
   }
 
+  // ---- 3. Projects : si le profil en déclare, ne garder que ceux-là ---------
+  let projects = cv.sections.projects ?? [];
+  if ((profile.projects ?? []).length > 0) {
+    projects = projects.flatMap((p) => {
+      const match = profile.projects.find(
+        (k) => looselyContains(p.name, k.name) || looselyContains(k.name, p.name)
+      );
+      if (!match) {
+        report.warnings.push(`Projet ignoré (absent du profil): "${p.name}"`);
+        return [];
+      }
+      return [{ ...p, url: match.url ?? null }];
+    });
+  }
+
   return {
     cv: {
       ...cv,
       sections: {
         ...cv.sections,
+        projects,
         experiences: finalExperiences,
         skills_flat: validSkills,
       },

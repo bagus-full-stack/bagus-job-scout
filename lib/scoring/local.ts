@@ -76,6 +76,13 @@ function scoreSector(
   return { score, matched };
 }
 
+/** Compétence ancrée : prouvée par une expérience OU par un projet du profil. */
+export function isAnchoredSkill(profile: ProfileFull, skill: ProfileFull["skills"][number]): boolean {
+  if (skill.evidence_experience_ids.length > 0) return true;
+  const key = normalize(skill.name);
+  return (profile.projects ?? []).some((p) => (p.skills_used ?? []).some((u) => normalize(u) === key));
+}
+
 function scoreSkills(
   profile: ProfileFull,
   description: string
@@ -83,8 +90,8 @@ function scoreSkills(
   if (!profile.skills.length) return { score: 30, matched: [], anchoredMatched: [] };
   const descNorm = normalize(description);
 
-  const anchoredSkills = profile.skills.filter((s) => s.evidence_experience_ids.length > 0);
-  const listedSkills = profile.skills.filter((s) => s.evidence_experience_ids.length === 0);
+  const anchoredSkills = profile.skills.filter((s) => isAnchoredSkill(profile, s));
+  const listedSkills = profile.skills.filter((s) => !isAnchoredSkill(profile, s));
 
   const matched: string[] = [];
   const anchoredMatched: string[] = [];
