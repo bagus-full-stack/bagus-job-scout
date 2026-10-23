@@ -22,12 +22,6 @@ function normalize(s: string): string {
     .trim();
 }
 
-/** Tolerant equality — handles small variations like "Société Générale" vs "Societe Generale". */
-function looselyEquals(a: string | null | undefined, b: string | null | undefined): boolean {
-  if (!a || !b) return false;
-  return normalize(a) === normalize(b);
-}
-
 /** Tolerant inclusion — "Acme Industries" contains "Acme". */
 function looselyContains(haystack: string, needle: string): boolean {
   return normalize(haystack).includes(normalize(needle));

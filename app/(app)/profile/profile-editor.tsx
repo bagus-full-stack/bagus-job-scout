@@ -27,7 +27,7 @@ import { COUNTRY_GROUPS } from "@/lib/countries";
 import { SOURCES_META } from "@/lib/sources-meta";
 import { EngineNotice } from "@/components/app/engine-notice";
 import { isAnchoredSkill } from "@/lib/cv/anchor";
-import type { ProfileFull, Experience, Education, Project, Skill, Language } from "@/lib/cv/types";
+import type { ProfileFull, Experience, Education, Project, Language } from "@/lib/cv/types";
 
 const SOURCES = SOURCES_META;
 const PROFILE_SECTIONS = [["#identite", "Identité"], ["#recherche", "Recherche"], ["#experiences", "Expériences"], ["#formations", "Formations"], ["#competences", "Compétences"], ["#langues", "Langues"], ["#parametres", "Paramètres"]] as const;

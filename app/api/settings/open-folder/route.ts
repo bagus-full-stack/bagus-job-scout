@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { spawn } from "node:child_process";
 import { getSetting } from "@/lib/db";
 import { documentsDir } from "@/lib/paths";
@@ -10,8 +10,7 @@ export const runtime = "nodejs";
  * Opens the documents folder in the user's OS file explorer.
  * Only meaningful when running locally (npm run dev).
  */
-export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
+export async function POST() {
   // Sécurité : on n'ouvre QUE le dossier documents configuré, jamais un chemin
   // arbitraire fourni par le client (body.path est ignoré).
   const target: string = getSetting("documents_folder") || documentsDir();
