@@ -135,7 +135,7 @@ const TOOL = {
           skill_groups: {
             type: "array",
             description:
-              "Compétences organisées par section (4 à 8 sections), ex. « Langages », « Frontend », « Backend & API », « Bases de données », « DevOps & qualité », « IA appliquée », « Méthodes ». Chaque section : un libellé court et 3 à 10 compétences/outils, les plus pertinentes pour l'offre en premier. Aucune compétence en double d'une section à l'autre.",
+              "Compétences organisées par section (4 à 8 sections), ex. « Langages », « Frontend », « Backend & API », « Bases de données », « DevOps & qualité », « IA appliquée », « Méthodes ». Chaque section : un libellé court et 5 à 15 compétences/outils, les plus pertinentes pour l'offre en premier. Au total 30 à 80 compétences, vise 50 ou plus : reprends presque toutes les compétences techniques du profil utiles pour l'offre ; le surplus sera retiré automatiquement s'il ne tient pas sur la page. Aucune compétence en double d'une section à l'autre.",
             items: {
               type: "object",
               properties: {
@@ -352,8 +352,8 @@ function enforceAtsLimits(cv: GeneratedCV, profile: ProfileFull): GeneratedCV {
   const words = summary.split(/\s+/);
   if (words.length > 90) summary = words.slice(0, 90).join(" ").replace(/[,;:]?$/, "") + ".";
 
-  // 8 sections de 10 compétences au plus ; skills_flat reste l'aplatissement des sections.
-  const skill_groups = (cv.sections.skill_groups ?? []).slice(0, 8).map((g) => ({ ...g, items: g.items.slice(0, 10) }));
+  // 8 sections de 15 compétences au plus ; skills_flat reste l'aplatissement des sections.
+  const skill_groups = (cv.sections.skill_groups ?? []).slice(0, 8).map((g) => ({ ...g, items: g.items.slice(0, 15) }));
   const skills_flat = skill_groups.length
     ? skill_groups.flatMap((g) => g.items)
     : (cv.sections.skills_flat ?? []).slice(0, 25);

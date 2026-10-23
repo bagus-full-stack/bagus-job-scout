@@ -46,7 +46,7 @@ function shrinkCV(cv: GeneratedCV, level: number): GeneratedCV {
   }
   const skill_groups = (cv.sections.skill_groups ?? []).map((g) => ({
     ...g,
-    items: g.items.slice(0, Math.max(4, 10 - level * 2)),
+    items: g.items.slice(0, Math.max(4, 15 - level * 3)),
   }));
   const skills_flat = skill_groups.length
     ? skill_groups.flatMap((g) => g.items)
@@ -74,6 +74,36 @@ function trimSentence(s: string, level: number): string {
   return (lastSpace > 60 ? cut.slice(0, lastSpace) : cut).trim() + "…";
 }
 
+const MIN_SKILLS = 20;
+
+/**
+ * Beaucoup de compétences (jusqu'à 80) peuvent faire déborder la page : on les
+ * réduit AVANT de toucher aux expériences et aux projets, en retirant les derniers
+ * rangs de chaque section (équilibré), sans descendre sous MIN_SKILLS.
+ */
+async function trimSkillsToFit(cv: GeneratedCV, fits: (c: GeneratedCV) => Promise<boolean>): Promise<GeneratedCV> {
+  const groups = cv.sections.skill_groups ?? [];
+  const ranked = groups
+    .flatMap((g, gi) => g.items.map((item, ii) => ({ gi, ii, item })))
+    .sort((x, y) => x.ii - y.ii || x.gi - y.gi);
+  const build = (keep: number): GeneratedCV => {
+    const dropped = new Set(ranked.slice(keep).map((x) => `${x.gi}|${x.item}`));
+    const skill_groups = groups
+      .map((g, gi) => ({ ...g, items: g.items.filter((i) => !dropped.has(`${gi}|${i}`)) }))
+      .filter((g) => g.items.length > 0);
+    return { ...cv, sections: { ...cv.sections, skill_groups, skills_flat: skill_groups.flatMap((g) => g.items) } };
+  };
+  if (ranked.length <= MIN_SKILLS || (await fits(cv))) return cv;
+  let lo = MIN_SKILLS;
+  let hi = ranked.length - 1;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (await fits(build(mid))) lo = mid;
+    else hi = mid - 1;
+  }
+  return build(lo);
+}
+
 /**
  * Renders CV to PDF. Le contenu complet est d'abord rendu avec la plus grande
  * taille de police qui tient sur une page (pas de vide en bas) ; si même la plus
@@ -88,7 +118,7 @@ export async function fitCVToOnePage(
     renderToBuffer(React.createElement(CVDocument, { cv: c, language, fontSize }) as any);
   const fits = async (c: GeneratedCV, fontSize: number) => (await pdfPageCount(await render(c, fontSize))) <= 1;
   const smallest = CV_FONT_SIZES[0];
-  let current = cv;
+  let current = await trimSkillsToFit(cv, (c) => fits(c, 9.5));
   for (let level = 0; level < 4; level++) {
     if (await fits(current, smallest)) {
       // Plus grande taille qui tient (la mise en page croît avec la taille : recherche dichotomique).
