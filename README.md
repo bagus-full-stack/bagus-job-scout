@@ -77,7 +77,7 @@ L'app démarre sur http://127.0.0.1:3000 (écoute limitée à la machine locale,
 | APEC | — | France (cadres) | **suspendue** : le site bloque désormais les requêtes automatiques |
 | Civiweb (V.I.E) | — | International | **suspendue** : Business France exige désormais une authentification que JobScout ne gère pas |
 
-**Avant d'activer une source, lisez les [conditions d'utilisation](CGU.md) (sections 5 et 6)** : les conditions de Welcome to the Jungle, HelloWork, Talent.com et LinkedIn interdisent l'extraction automatisée. C'est pourquoi, depuis la 3.4.13, seule France Travail est cochée d'office. Chaque source s'active ou se désactive dans Profil › Recherche › Sources (ou à l'étape Préférences de l'onboarding). Une source suspendue n'est jamais interrogée, même si elle est restée cochée dans un ancien profil. Une source hors périmètre géographique (ex. HelloWork quand le profil ne cible pas la France) est automatiquement sautée. La disponibilité des sources dépend des sites tiers (anti-bot, changements d'API) ; une source en échec est signalée dans le journal du scan.
+**Avant d'activer une source, lisez les [conditions d'utilisation](CGU.md) (sections 5 et 6)** : les conditions de Welcome to the Jungle, HelloWork, Talent.com et LinkedIn interdisent l'extraction automatisée. C'est pourquoi, depuis la 3.4.13, seule France Travail est cochée d'office. Chaque source s'active ou se désactive dans Profil › Recherche › Sources (ou à l'étape Préférences de l'onboarding). Une source suspendue n'est jamais interrogée, même si elle est restée cochée dans un ancien profil. Une source hors périmètre géographique (ex. HelloWork quand le profil ne cible pas la France) est automatiquement sautée. **Profondeur de recherche** (Profil › Profondeur de recherche) : nombre de pages de résultats parcourues par intitulé cible et par source, de 1 à 10 (5 par défaut) ; le plafond d'offres par source suit la même proportion. Plus c'est profond, plus le scan est long et plus les sites risquent de limiter les requêtes (LinkedIn surtout). La disponibilité des sources dépend des sites tiers (anti-bot, changements d'API) ; une source en échec est signalée dans le journal du scan.
 
 WTTJ est interrogée avec la clé de recherche (lecture seule) qu'utilise l'interface du site. Si elle cesse de fonctionner, décochez la source.
 
@@ -93,6 +93,14 @@ WTTJ est interrogée avec la clé de recherche (lecture seule) qu'utilise l'inte
 - **Bonus Durée V.I.E** (jusqu'à +5, V.I.E uniquement) — +5 pour 12–24 mois, +3 pour 6–11 mois
 
 Aucun appel IA : instantané et illimité. Re-scoring global : `POST /api/offres/rescore` (après modification du profil).
+
+## Filtre par expérience (local)
+
+Page Offres › « Expérience de X à Y ans » (`lib/experience.ts`). L'annonce n'a pas de champ dédié : l'exigence est lue dans le texte (4 000 premiers caractères), seulement à côté du mot « expérience » pour ne pas confondre avec « 20 ans d'existence ».
+- **Reconnu** : tranche (« 2 à 5 ans d'expérience », « 3-5 years »), minimum (« au moins 3 ans », « 5+ years of experience »), « débutant accepté », « jeune diplômé » ; à défaut de chiffre, le titre (« Junior » : 0 à 2 ans ; « Senior », « Lead », « Confirmé » : 5 ans et plus).
+- **Filtre** : une offre est gardée si son exigence chevauche votre fourchette (0 à 3 ans garde « débutant », « 2 ans minimum », « 3 à 5 ans », pas « 5 ans minimum »). Chaque champ peut rester vide.
+- **Sans précision** (environ la moitié des offres) : écartées par défaut, avec leur nombre et un bouton « Les inclure ».
+- C'est une lecture de texte : elle peut se tromper sur une phrase ambiguë. L'exigence lue est affichée sur chaque offre.
 
 ## Filtre par distance (local)
 
