@@ -30,6 +30,8 @@ const SYSTEM_FR = `Tu es correcteur professionnel francophone pour des documents
 4. Chronologie : les connecteurs temporels (« auparavant », « plus tôt », « précédemment », « ensuite », « en parallèle ») doivent être cohérents avec les dates des faits — corrige le connecteur s'il contredit l'ordre réel des expériences.
 5. Ne change RIEN d'autre : pas de réécriture stylistique, pas d'ajout, pas de réordonnancement, longueur conservée à ±10 %. Conserve les noms propres, dates, chiffres et intitulés présents dans les faits.
 
+Les balises de gras \`**mot**\` font partie du texte : conserve-les à l'identique autour des mêmes mots (ne les retire pas, n'en ajoute pas).
+
 Renvoie EXACTEMENT le même nombre de textes, dans le même ordre, via l'outil, avec la liste courte des corrections effectuées (vide si rien à corriger).`;
 
 const SYSTEM_EN = `You are a professional English-language proofreader for job application documents (résumé and cover letter) addressed to an English-speaking employer. You receive a list of generated texts and the candidate's profile FACTS (the facts are written in French). Correct each text, in this order of priority:
@@ -40,6 +42,8 @@ const SYSTEM_EN = `You are a professional English-language proofreader for job a
 4. Résumé bullets (texts starting with an action): past-tense action verb or noun phrase ("Managed…", "Coordination of…"); never first person ("I managed"), no trailing period.
 5. Chronology: time connectors ("earlier", "previously", "then", "in parallel", "since") must be consistent with the dates in the facts — fix the connector when it contradicts the real order of the experiences.
 6. Change NOTHING else: no stylistic rewrite, no additions, no reordering, length within ±10%. Keep the proper nouns, dates, figures and titles present in the facts.
+
+Bold markers \`**word**\` are part of the text: keep them unchanged around the same words (do not remove them, do not add any).
 
 Return EXACTLY the same number of texts, in the same order, via the tool, with a short list of the corrections made (empty if nothing to correct).`;
 

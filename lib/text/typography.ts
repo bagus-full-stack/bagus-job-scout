@@ -97,14 +97,21 @@ export function eduYearRange(start?: string | null, end?: string | null, lang: D
   return s || e || "";
 }
 
-/** Date d'expérience : « 2024-03 » → « 03/2024 » ; poste en cours → « Aujourd'hui » / « Present ». */
+const MONTHS: Record<DocLang, string[]> = {
+  fr: ["Janv", "Fév", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"],
+  en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"],
+};
+
+/** Date d'expérience : « 2024-09 » ou « 09/2024 » → « Sept 2024 » ; poste en cours → « Aujourd'hui » / « Present ». */
 export function expDate(d: string | null | undefined, lang: DocLang = "fr"): string {
   if (!d) return "";
   const v = d.trim();
   if (ONGOING_RE.test(v)) return LABELS[lang].ongoing;
   // 2024-03 ou 2024-03-01 (le modèle renvoie parfois la date complète) → 03/2024
-  const m = v.match(/^(\d{4})-(\d{2})(?:-\d{2})?$/);
-  if (m) return `${m[2]}/${m[1]}`;
+  const iso = v.match(/^(\d{4})-(\d{2})(?:-\d{2})?$/);
+  const fr = v.match(/^(\d{1,2})\/(\d{4})$/);
+  const [mm, yyyy] = iso ? [iso[2], iso[1]] : fr ? [fr[1], fr[2]] : [];
+  if (mm && yyyy && +mm >= 1 && +mm <= 12) return `${MONTHS[lang][+mm - 1]} ${yyyy}`;
   return v;
 }
 

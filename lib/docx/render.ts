@@ -1,5 +1,6 @@
 import "server-only";
 import { Document, Packer, Paragraph, TextRun, AlignmentType } from "docx";
+import { splitBold } from "@/lib/text/rich";
 import type { GeneratedCV } from "@/lib/ai/generate-cv";
 import type { GeneratedLM } from "@/lib/ai/generate-lm";
 import {
@@ -39,7 +40,7 @@ function bulletParagraphs(items: string[], ty: Ty, after = 30): Paragraph[] {
         new Paragraph({
           bullet: { level: 0 },
           spacing: { after },
-          children: [new TextRun({ text: ty(b), size: SZ_BODY, font: FONT })],
+          children: splitBold(ty(b)).map((p) => new TextRun({ text: p.text, bold: p.bold, size: SZ_BODY, font: FONT })),
         })
     );
 }
@@ -106,7 +107,7 @@ export async function renderCVDocx(cv: GeneratedCV, language: DocLang = "fr", fo
     children.push(
       new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
-        children: [new TextRun({ text: ty(cv.summary), size: SZ_BODY, font: FONT })],
+        children: splitBold(ty(cv.summary)).map((p) => new TextRun({ text: p.text, bold: p.bold, size: SZ_BODY, font: FONT })),
         spacing: { after: 80 },
       })
     );

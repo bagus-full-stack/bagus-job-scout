@@ -40,6 +40,7 @@ Langues : Français (Natif) | Anglais (B2) | …
 3. **Style des puces** : style **nominal** (« Pilotage de… », « Animation de… », « Conception de… ») ou **participe passé** (« Piloté… »). **Interdit** : verbe conjugué à la première personne en tête de puce (« Pilote », « Conçois », « Construis », « Anime », « Établis », « Conduis »). Pas de point final sur les puces. Chaque puce commence par une majuscule.
 4. **Zéro invention — règle absolue** : chaque puce reformule une puce ou une description **existante** du profil. N'ajoute **aucune** activité, responsabilité, outil, chiffre, résultat ou périmètre absent du profil (ex. : budget, négociation, prospection, cahier des charges, reporting, management d'équipe, pourcentage). Si le profil ne le dit pas, le CV ne le dit pas. Langues : uniquement celles de `profile.languages`, avec leur niveau exact.
 4bis. **`headline`** : titre court (2 à 5 mots) sous le nom, calqué sur l'intitulé de l'offre MAIS vrai pour le profil (ex. offre « Développeur Full Stack Java H/F » → « Ingénieur Full Stack Java » ; profil Full Stack + IA et offre IA → « Ingénieur IA & Full Stack »). Pas de « H/F », pas de séniorité que le parcours ne porte pas, pas de nom d'entreprise.
+4ter. **Mots-clés en gras** : dans le PROFIL et dans les puces, entoure de `**…**` les technologies clés de l'offre et les chiffres marquants (ex. « **Java / Spring Boot** », « **200+ flux/jour** », « **-60 %** »). 3 à 8 balises dans le PROFIL, 0 à 2 par puce, jamais une phrase entière. Ces balises sont rendues en gras dans le CV.
 5. **PROFIL** : 3-5 phrases naturelles. Pas de formule figée du type « Candidat motivé pour le poste de… » : termine par une phrase d'accroche qui relie ton parcours au poste visé. Cite l'intitulé du poste **sans** ses marques de genre (« F/H », « (H/F) », « H/F/X ») et en corrigeant un éventuel accord évident.
 6. **Dates** : expériences en `MM/AAAA - MM/AAAA` (poste en cours : `MM/AAAA - Aujourd'hui`) ; formations en `MM/AAAA - MM/AAAA` (année seule si le mois est inconnu). Reprends exactement les dates du profil ; si un mois est inconnu, ne l'invente pas (utilise l'année seule).
 7. **Mots-clés de l'offre** intégrés naturellement dans PROFIL, expériences et compétences (densité 2-3 %), uniquement quand le profil les couvre réellement.
@@ -49,6 +50,13 @@ Langues : Français (Natif) | Anglais (B2) | …
 11. **Formations** en ordre anti-chronologique (la plus récente en premier), libellés repris du profil (`degree`, `field`, `school` tels quels). **Aucune puce** (`bullet_points` vide) : le diplôme et l'école suffisent, rien à répéter.
 12. **Accroche bornée au réel** : les années d'expérience annoncées correspondent à la durée totale des postes ; n'écris pas « X ans d'expérience en [spécialité] » si un seul poste couvre cette spécialité ; pas de posture de séniorité que le parcours ne porte pas.
 13. **Orthographe, grammaire, typographie** : relis-toi. Accords en genre et en nombre, accents (y compris sur les majuscules : « Étude »), espace insécable avant « : », « ; », « ! », « ? ». Pas d'emoji, pas d'icône, pas de symbole exotique, pas d'anglicisme inutile.
+
+## Exemple de style (CV de référence du candidat — à adapter à l'offre, ne rien reprendre qui ne soit pas dans le profil)
+
+PROFIL : « Ingénieur diplômé Bac+5 en Ingénierie Logicielle et IA, **disponible immédiatement** en **CDI Full Stack**. 3 ans d'expérience en entreprise sur des systèmes critiques et des plateformes web : **Java / Spring Boot, Python / FastAPI, Angular, React, TypeScript**, **API REST**, **SQL / NoSQL**. Je livre des applications complètes, de la conception au déploiement (**Docker, CI/CD**), avec tests, revues de code et maintenance en production. »
+Puce : « Conception en Python de **PYMQCOPY**, programme critique de routage de messages MQ vers le cloud et les micro-services (**200+ flux/jour**) »
+
+Ce qui fait décrocher un entretien : le PROFIL reprend les mots de l'offre (poste, technologies, contrat) ; chaque puce commence par le résultat ou la réalisation et porte un chiffre quand le profil en a un ; les technologies de l'offre sont visibles (gras) ; les expériences et projets les plus proches de l'offre passent en premier.
 
 ## Calibration et style (principes de rédaction)
 

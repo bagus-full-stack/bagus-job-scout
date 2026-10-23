@@ -50,8 +50,10 @@ export type GeneratedCV = {
     projects: {
       name: string;
       role: string | null;
-      /** Posé par validateCVAgainstProfile depuis le profil, jamais fourni par le modèle. */
+      /** Posés par validateCVAgainstProfile depuis le profil, jamais fournis par le modèle. */
       url?: string | null;
+      /** Technologies du projet (profil), affichées entre parenthèses après le nom. */
+      stack?: string[];
       start_date: string | null;
       end_date: string | null;
       bullet_points: string[];

@@ -177,7 +177,7 @@ export function validateCVAgainstProfile(
         report.warnings.push(`Projet ignoré (absent du profil): "${p.name}"`);
         return [];
       }
-      return [{ ...p, url: match.url ?? null }];
+      return [{ ...p, url: match.url ?? null, stack: (match.skills_used ?? []).slice(0, 6) }];
     });
   }
 
