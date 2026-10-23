@@ -135,10 +135,7 @@ export function ActionsPanel({
         lm_pdf_id: data.lm.pdfId,
         lm_docx_id: data.lm.docxId,
       }));
-      if (data.folder) {
-        setFolder(data.folder);
-        openFolder(data.folder);
-      }
+      if (data.folder) setFolder(data.folder);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur réseau");
     } finally {
@@ -168,10 +165,7 @@ export function ActionsPanel({
       }
       setDocs((d) => ({ ...d, msg_id: data.document_id }));
       if (data.text) setMsgPreview({ text: data.text, length: data.length });
-      if (data.folder) {
-        setFolder(data.folder);
-        openFolder(data.folder);
-      }
+      if (data.folder) setFolder(data.folder);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur réseau");
     } finally {
