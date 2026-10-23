@@ -6,6 +6,7 @@ import { buildDocFilename, listDocuments } from "@/lib/db/documents";
 import { createCandidature, updateCandidature } from "@/lib/db/candidatures";
 import { isEmail } from "@/lib/mail/contact";
 import { sendMail } from "@/lib/mail/send";
+import { checkDomain } from "@/lib/mail/dns-check";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,6 +21,9 @@ export async function POST(req: NextRequest) {
   const text = String(b?.body ?? "").trim();
   if (!isEmail(to)) return NextResponse.json({ error: "Adresse du destinataire invalide." }, { status: 400 });
   if (!subject || !text) return NextResponse.json({ error: "Objet et message requis." }, { status: 400 });
+  // Domaine sans MX ni adresse : le mail reviendrait en erreur. « unknown » (DNS en panne) ne bloque pas.
+  if ((await checkDomain(to.split("@")[1])) === "invalid")
+    return NextResponse.json({ error: `Le domaine de ${to} ne reçoit pas de courrier : vérifiez l'adresse.` }, { status: 400 });
   const offre = getOffre(offreId);
   if (!offre) return NextResponse.json({ error: "Offre introuvable." }, { status: 404 });
 

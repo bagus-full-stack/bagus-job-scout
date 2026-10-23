@@ -8,7 +8,9 @@ export type Contact = { email: string; company: string };
 // Messageries grand public : le domaine ne dit rien de l'entreprise.
 const FREE_MAIL = /^(gmail|googlemail|outlook|hotmail|live|msn|yahoo|ymail|icloud|me|proton|protonmail|orange|wanadoo|free|sfr|laposte|neuf|bbox)\./i;
 
-const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const COMPANY_HEADER = /^(entreprise|soci[ée]t[ée]|company|organi[sz]ation|organisme|nom)$/i;
+
+const titleCase =(s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
  * Lit un fichier de contacts (CSV, TSV ou texte, une ligne par contact). La première
@@ -19,17 +21,27 @@ const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export function parseContacts(text: string): Contact[] {
   const seen = new Set<string>();
   const out: Contact[] = [];
+  // Colonne « entreprise » repérée par l'en-tête (ligne sans adresse), sinon première cellule textuelle.
+  let companyCol = -1;
   for (const line of text.split(/\r?\n/)) {
     const cells = line.split(/[;,\t]/).map((c) => c.trim().replace(/^["']|["']$/g, "").trim());
-    const idx = cells.findIndex((c) => findApplyEmail(c));
-    if (idx < 0) continue;
-    const email = findApplyEmail(cells[idx])!;
-    if (seen.has(email)) continue;
-    seen.add(email);
-    const domain = email.split("@")[1];
-    const other = cells.find((c, i) => i !== idx && c && !findApplyEmail(c));
-    const company = other || (FREE_MAIL.test(domain) ? email : titleCase(domain.split(".")[0]));
-    out.push({ email, company });
+    if (!cells.some((c) => findApplyEmail(c))) {
+      const col = cells.findIndex((c) => COMPANY_HEADER.test(c));
+      if (col >= 0) companyCol = col;
+      continue;
+    }
+    // Une ligne peut porter plusieurs adresses (une par colonne) : chacune est un contact.
+    // Les cellules purement numériques (n° de ligne) ne sont jamais un nom d'entreprise.
+    const other =
+      (companyCol >= 0 && cells[companyCol] && !findApplyEmail(cells[companyCol]) ? cells[companyCol] : "") ||
+      cells.find((c) => c && !findApplyEmail(c) && !/^\d+$/.test(c));
+    for (const cell of cells) {
+      const email = findApplyEmail(cell);
+      if (!email || seen.has(email)) continue;
+      seen.add(email);
+      const domain = email.split("@")[1];
+      out.push({ email, company: other || (FREE_MAIL.test(domain) ? email : titleCase(domain.split(".")[0])) });
+    }
   }
   return out;
 }

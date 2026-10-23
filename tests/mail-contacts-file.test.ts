@@ -17,6 +17,13 @@ describe("parseContacts", () => {
       { email: "moi@gmail.com", company: "moi@gmail.com" },
     ]);
   });
+  it("ignore un n° de ligne et suit l'en-tête « Entreprise »", () => {
+    expect(parseContacts("N°;Secteur;Entreprise;Email\n1;Conseil;Capgemini;recrutement@capgemini.com\n2;Conseil;Atos;careers@atos.net")).toEqual([
+      { email: "recrutement@capgemini.com", company: "Capgemini" },
+      { email: "careers@atos.net", company: "Atos" },
+    ]);
+    expect(parseContacts("1;recrutement@cgi.com;CGI")).toEqual([{ email: "recrutement@cgi.com", company: "CGI" }]);
+  });
   it("ignore noreply et les lignes sans adresse", () => {
     expect(parseContacts("noreply@acme.fr\nrien ici\n")).toEqual([]);
   });

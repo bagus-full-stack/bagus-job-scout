@@ -196,7 +196,7 @@ function buildOffresCache(fingerprint: string): OffresCache {
       -- France Travail range parfois le département dans le champ entreprise (« 974 »).
       CASE WHEN o.source = 'francetravail' AND (trim(o.company) GLOB '[0-9][0-9]' OR trim(o.company) GLOB '[0-9][0-9][0-9]' OR trim(o.company) IN ('2A', '2B'))
         THEN trim(o.company) END AS geo_dep
-    FROM offres o ORDER BY ${SMART_ORDER}
+    FROM offres o WHERE o.source <> 'spontanee' ORDER BY ${SMART_ORDER}
   `).all() as CacheRow[];
 
   const contractCounts = Object.fromEntries(CONTRACT_ORDER.map((contract) => [contract, 0])) as Record<ContractCategory, number>;

@@ -186,7 +186,37 @@ export function saveDocument(args: {
   };
 }
 
+/**
+ * Retire de la base les documents dont le fichier a été supprimé à la main. Sans effet si le
+ * dossier de stockage lui-même est introuvable (disque débranché, lecteur réseau absent) :
+ * on ne vide jamais la liste pour une indisponibilité temporaire.
+ */
+function pruneMissingDocuments() {
+  if (!fs.existsSync(docsRootResolved())) return;
+  const db = getDb();
+  const rows = db.prepare("SELECT id, file_path FROM documents").all() as { id: number; file_path: string }[];
+  for (const r of rows) if (!fs.existsSync(r.file_path)) db.prepare("DELETE FROM documents WHERE id = ?").run(r.id);
+}
+
+/** Supprime un dossier (tous les documents d'une offre) ou un document isolé : fichiers puis lignes. */
+export function deleteDocuments(target: { offreId: number } | { docId: number }): number {
+  const docs = "offreId" in target ? listDocuments({ offreId: target.offreId }) : [getDocument(target.docId)].filter((d): d is DocumentRow => !!d);
+  const db = getDb();
+  for (const d of docs) {
+    try {
+      fs.rmSync(d.file_path, { force: true });
+      const dir = path.dirname(d.file_path);
+      if (path.resolve(dir) !== path.resolve(docsRootResolved())) fs.rmdirSync(dir); // seulement si vide, jamais la racine
+    } catch {
+      // dossier non vide ou déjà supprimé : on garde le dossier
+    }
+    db.prepare("DELETE FROM documents WHERE id = ?").run(d.id);
+  }
+  return docs.length;
+}
+
 export function listDocuments(filter?: { type?: DocType; offreId?: number }): DocumentRow[] {
+  pruneMissingDocuments();
   const db = getDb();
   const where: string[] = [];
   const params: any[] = [];

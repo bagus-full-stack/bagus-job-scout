@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, ArrowUpRight, Download, FileText, FolderOpen, Mail, MessageSquare } from "lucide-react";
 import { listDocuments, type DocumentRow } from "@/lib/db/documents";
 import { getDb } from "@/lib/db";
+import { DeleteDossier } from "./delete-dossier";
 import { PageHeader } from "@/components/app/page-header";
 import path from "node:path";
 
@@ -74,6 +75,7 @@ function DossierCard({ dossier }: { dossier: Dossier }) {
   return (
     <article className="glass-panel overflow-hidden">
       <div className="relative border-b border-border px-5 py-6 sm:px-6">
+        <DeleteDossier offreId={dossier.offreId} docId={dossier.docs[0].id} label={dossier.title} />
         <span className="brand-mark mb-5 h-12 w-12 rounded-[16px]"><FolderOpen className="h-6 w-6" strokeWidth={1.25} /></span>
         <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-textSecondary">{dossier.offreId != null ? dossier.company || "Entreprise non précisée" : "Document indépendant"}</p>
         {dossier.offreId ? (
