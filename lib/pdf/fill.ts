@@ -3,7 +3,8 @@ import * as React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { CVDocument, CV_FONT_SIZES } from "./cv-template";
 import { fitCVToOnePage, pdfPageCount } from "./render";
-import { generateCV, type GeneratedCV } from "@/lib/ai/generate-cv";
+import { generateCV, expandSkills, type GeneratedCV } from "@/lib/ai/generate-cv";
+import { translateToEnglish } from "@/lib/ai/proofread";
 import type { ProfileFull } from "@/lib/cv/types";
 import type { OffreFiltered } from "@/lib/db/offres";
 import type { DocLang } from "@/lib/text/lang";
@@ -13,6 +14,7 @@ import type { DocLang } from "@/lib/text/lang";
 const REF_FONT = 10;
 const MIN_FREE = 30;
 const MAX_ROUNDS = 3;
+const MIN_FREE_SKILLS = 15;
 
 const pagesAt = async (cv: GeneratedCV, lang: DocLang, fontSize: number, probe = 0) =>
   pdfPageCount(await renderToBuffer(React.createElement(CVDocument, { cv, language: lang, fontSize, probe }) as any));
@@ -68,5 +70,63 @@ export async function fitAndFillCV(
     free = nextFree;
     console.log(`[fillCV] tour ${round + 1} : place libre ${Math.round(free)} pt`);
   }
+  current = await fillSkills(current, free, ctx);
   return fitCVToOnePage(current, ctx.lang);
+}
+
+const withGroups = (cv: GeneratedCV, skill_groups: { label: string; items: string[] }[]): GeneratedCV => ({
+  ...cv,
+  sections: { ...cv.sections, skill_groups, skills_flat: skill_groups.flatMap((g) => g.items) },
+});
+
+/**
+ * Enrichit la section compétences tant qu'il reste de la place : sections adaptées à
+ * l'offre, garnies des compétences du profil. Les ajouts sont retirés (derniers
+ * d'abord) jusqu'à ce que le CV tienne sur une page à la taille de référence.
+ */
+async function fillSkills(
+  cv: GeneratedCV,
+  free: number,
+  ctx: { profile: ProfileFull; offre: OffreFiltered; lang: DocLang }
+): Promise<GeneratedCV> {
+  if (free < MIN_FREE_SKILLS) return cv;
+  let proposed: { label: string; items: string[] }[];
+  try {
+    proposed = await expandSkills(ctx.profile, ctx.offre, ctx.lang, cv, Math.floor(free / (REF_FONT * 1.22)));
+  } catch (e) {
+    console.error("[fillCV] enrichissement des compétences ignoré :", e);
+    return cv;
+  }
+  // CV en anglais : les compétences ajoutées viennent du profil (français) et les libellés
+  // de sections sont ceux du modèle ; tout est passé par le traducteur, comme à la génération.
+  if (ctx.lang === "en") {
+    const texts = [...new Set(proposed.flatMap((g) => [g.label, ...g.items]))];
+    const tr = await translateToEnglish(texts, "cv-skills");
+    const map = new Map(texts.map((t, i) => [t, tr[i] ?? t]));
+    proposed = proposed.map((g) => ({
+      label: map.get(g.label) ?? g.label,
+      items: [...new Set(g.items.map((i) => map.get(i) ?? i))],
+    }));
+  }
+  const had = new Set((cv.sections.skill_groups ?? []).flatMap((g) => g.items.map((i) => i.toLowerCase())));
+  // Ajouts classés par rang dans leur section puis par section : on en retire de façon équilibrée.
+  const added = proposed
+    .flatMap((g, gi) => g.items.map((item, ii) => ({ gi, ii, item })).filter((x) => !had.has(x.item.toLowerCase())))
+    .sort((x, y) => x.ii - y.ii || x.gi - y.gi);
+  const build = (keep: number) => {
+    const dropped = new Set(added.slice(keep).map((x) => x.item));
+    return withGroups(
+      cv,
+      proposed.map((g) => ({ ...g, items: g.items.filter((i) => !dropped.has(i)) })).filter((g) => g.items.length > 0)
+    );
+  };
+  let lo = 0;
+  let hi = added.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if ((await pagesAt(build(mid), ctx.lang, REF_FONT)) <= 1) lo = mid;
+    else hi = mid - 1;
+  }
+  console.log(`[fillCV] compétences : ${lo}/${added.length} ajouts retenus`);
+  return lo > 0 ? build(lo) : cv;
 }

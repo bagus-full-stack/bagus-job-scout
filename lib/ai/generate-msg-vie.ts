@@ -4,6 +4,7 @@ import path from "node:path";
 import { callStructured, type StructuredTool } from "./llm";
 import { AiContentError, assertNotTruncated } from "./errors";
 import type { ProfileFull } from "@/lib/cv/types";
+import { isAnchoredSkill } from "@/lib/cv/anchor";
 import type { OffreFiltered } from "@/lib/db/offres";
 import { msgLanguageInstruction } from "./lang-prompts";
 import { detectDocLanguage, sourceLanguageHint, type DocLang } from "@/lib/text/lang";
@@ -92,11 +93,11 @@ function buildUserPrompt(profile: ProfileFull, offre: OffreFiltered, lang: DocLa
     .join(" ; ");
 
   const skillsAnchored = profile.skills
-    .filter((s) => s.evidence_experience_ids.length > 0)
+    .filter((s) => isAnchoredSkill(profile, s))
     .map((s) => s.name)
     .slice(0, 20);
   const skillsListed = profile.skills
-    .filter((s) => s.evidence_experience_ids.length === 0)
+    .filter((s) => !isAnchoredSkill(profile, s))
     .map((s) => s.name)
     .slice(0, 10);
 

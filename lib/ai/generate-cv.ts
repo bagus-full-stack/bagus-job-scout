@@ -9,6 +9,7 @@ import { proofreadCV, translateToEnglish } from "./proofread";
 import { cvLanguageInstruction } from "./lang-prompts";
 import { detectDocLanguage, sourceLanguageHint, type DocLang } from "@/lib/text/lang";
 import type { ProfileFull } from "@/lib/cv/types";
+import { isAnchoredSkill } from "@/lib/cv/anchor";
 import type { OffreFiltered } from "@/lib/db/offres";
 
 export type GeneratedCV = {
@@ -241,6 +242,92 @@ export async function generateCV(
   );
 }
 
+const SKILLS_TOOL = {
+  name: "build_skills",
+  description: "Renvoie les sections de compétences complétées.",
+  input_schema: {
+    type: "object",
+    properties: {
+      skill_groups: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: { label: { type: "string" }, items: { type: "array", items: { type: "string" } } },
+          required: ["label", "items"],
+        },
+      },
+    },
+    required: ["skill_groups"],
+  },
+} as const;
+
+/**
+ * Enrichit les sections de compétences d'un CV qui a encore de la place : sections
+ * adaptées à l'offre (nouvelles sections comprises), garnies avec les compétences
+ * du profil pas encore affichées. Retourne les sections complètes, filtrées par le
+ * validateur anti-invention (jamais de compétence absente du profil). L'ajustement
+ * à la page est fait par l'appelant (lib/pdf/fill.ts).
+ */
+export async function expandSkills(
+  profile: ProfileFull,
+  offre: OffreFiltered,
+  lang: DocLang,
+  current: GeneratedCV,
+  freeLines: number
+): Promise<{ label: string; items: string[] }[]> {
+  const groups = current.sections.skill_groups ?? [];
+  const shown = new Set(groups.flatMap((g) => g.items.map((i) => i.toLowerCase())));
+  // Compétences techniques du profil pas encore affichées (les soft skills creuses restent exclues).
+  const remaining = profile.skills
+    .filter((sk) => sk.category !== "soft" && !shown.has(sk.name.toLowerCase()))
+    .map((sk) => ({ name: sk.name, anchored: isAnchoredSkill(profile, sk) }));
+  if (!remaining.length) return groups;
+
+  const vocab =
+    lang === "en"
+      ? [...new Set([...profile.skills.map((x) => x.name), ...profile.experiences.flatMap((e) => e.skills_used ?? []), ...(profile.projects ?? []).flatMap((pr) => pr.skills_used ?? [])].filter(Boolean))]
+      : [];
+  const vocabEn = vocab.length ? await translateToEnglish(vocab, "profile-skills") : [];
+
+  const message = await callStructured({
+    role: "writer",
+    maxTokens: 3000,
+    system: [
+      {
+        text: "Tu enrichis la section COMPÉTENCES d'un CV. Tu renvoies TOUTES les sections (celles qui existent, en gardant leurs compétences, plus les ajouts), via l'outil `build_skills`. Règles : (1) tu n'ajoutes que des compétences de la liste « disponibles », jamais d'autres ; (2) tu peux créer de nouvelles sections pertinentes pour l'offre (ex. « IA appliquée », « Data & ML », « Cloud », « Tests & qualité », « Architecture ») et ranger les compétences dans la section la plus juste ; (3) une compétence n'apparaît que dans une section ; (4) ordre : sections les plus pertinentes pour l'offre d'abord, et dans chaque section les compétences les plus pertinentes d'abord ; (5) AJOUTE AUTANT de compétences disponibles que possible : elles sont toutes vraies, la place est libre ; commence par celles que l'offre mentionne ou qui sont ancrées ; (6) libellés courts, 6 à 8 sections au plus ; (7) AUCUN quasi-doublon, y compris entre sections : garde la forme la plus complète (« MQ Series » sans « MQ », « Swagger / OpenAPI » sans « Swagger », « HTML/CSS » sans « HTML » ni « CSS », « Tests unitaires (JUnit) » sans « JUnit ») ; (8) uniquement des outils, technologies, méthodes ou domaines techniques, jamais une activité (« Développement full stack ») ni un mot vague (« Cloud » seul).",
+      },
+    ],
+    tool: SKILLS_TOOL as unknown as StructuredTool,
+    user: `${cvLanguageInstruction(lang)}
+
+## Offre cible
+- Titre: ${offre.title}
+- Description:
+${offre.description_text.slice(0, 4000)}
+
+## Sections actuelles
+${JSON.stringify(groups)}
+
+## Compétences disponibles (à ajouter)
+${JSON.stringify(remaining)}
+
+Il reste environ ${freeLines} lignes libres : remplis-les.`,
+  });
+  assertNotTruncated(message, "les compétences");
+  const raw = parseGeneratedCV({
+    ...current,
+    sections: { ...current.sections, skill_groups: (message.input as { skill_groups?: unknown })?.skill_groups },
+  });
+  const validation = vocabEn.length
+    ? { extraKnownSkills: vocabEn, strict: vocabEn.some((v, i) => v !== vocab[i]) }
+    : {};
+  const { cv: validated } = validateCVAgainstProfile(raw, profile, lang, validation);
+  const kept = new Set(validated.sections.skills_flat);
+  return (raw.sections.skill_groups ?? [])
+    .map((g) => ({ label: g.label, items: [...new Set(g.items.filter((i) => kept.has(i)))] }))
+    .filter((g) => g.items.length > 0);
+}
+
 /**
  * Hard guards to keep the CV on a single page even if the model overshoots the prompt limits.
  * - Max 4 experiences (most recent first; the model already sorts but we re-sort defensively)
@@ -326,7 +413,7 @@ function stripIds(p: ProfileFull) {
       name: s.name,
       category: s.category,
       level: s.level,
-      anchored: s.evidence_experience_ids.length > 0,
+      anchored: isAnchoredSkill(p, s),
     })),
     languages: p.languages,
   };

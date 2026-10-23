@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { isAnchoredSkill } from "@/lib/cv/anchor";
 import type { ProfileFull, Project } from "@/lib/cv/types";
 
 type Section = "identity" | "experiences" | "educations" | "projects" | "skills" | "languages";
@@ -411,11 +412,11 @@ export function VerifyForm() {
           {profile.skills.map((s, i) => (
             <Badge
               key={i}
-              variant={s.evidence_experience_ids.length > 0 ? "success" : "default"}
+              variant={isAnchoredSkill(profile, s) ? "success" : "default"}
               className="pl-3 pr-1.5 py-1 gap-1.5 inline-flex items-center cursor-default"
               title={
-                s.evidence_experience_ids.length > 0
-                  ? "Compétence ancrée sur une expérience"
+                isAnchoredSkill(profile, s)
+                  ? "Compétence ancrée sur une expérience ou un projet"
                   : "Sans preuve d'expérience"
               }
             >

@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { COUNTRY_GROUPS } from "@/lib/countries";
 import { SOURCES_META } from "@/lib/sources-meta";
 import { EngineNotice } from "@/components/app/engine-notice";
+import { isAnchoredSkill } from "@/lib/cv/anchor";
 import type { ProfileFull, Experience, Education, Project, Skill, Language } from "@/lib/cv/types";
 
 const SOURCES = SOURCES_META;
@@ -1080,11 +1081,11 @@ function SkillsCard({
         {profile.skills.map((s, i) => (
           <Badge
             key={i}
-            variant={s.evidence_experience_ids.length > 0 ? "success" : "default"}
+            variant={isAnchoredSkill(profile, s) ? "success" : "default"}
             className="pl-3 pr-1.5 py-1 gap-1.5 inline-flex items-center"
             title={
-              s.evidence_experience_ids.length > 0
-                ? "Compétence ancrée sur une expérience"
+              isAnchoredSkill(profile, s)
+                ? "Compétence ancrée sur une expérience ou un projet"
                 : "Sans preuve d'expérience"
             }
           >
