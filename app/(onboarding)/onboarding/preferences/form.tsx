@@ -177,6 +177,7 @@ export function PreferencesForm() {
               ["vie", "V.I.E"],
               ["stage", "Stage"],
               ["alternance", "Alternance"],
+              ["graduate", "Graduate program"],
             ] as const
           ).map(([id, label]) => (
             <Chip

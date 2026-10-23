@@ -306,6 +306,8 @@ function scoreContract(
   const prefs = preferred?.length ? preferred : ["cdi", "cdd"];
   if (category === "autre") return { score: 50, category };
   if (prefs.includes(category)) return { score: 100, category };
+  // Un graduate program mène à un CDI : il convient aussi à qui cherche un CDI.
+  if (category === "graduate" && prefs.includes("cdi")) return { score: 100, category };
   return { score: 20, category };
 }
 

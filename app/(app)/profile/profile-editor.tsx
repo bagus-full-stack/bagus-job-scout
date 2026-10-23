@@ -406,6 +406,7 @@ function SearchCard({
             ["vie", "V.I.E"],
             ["stage", "Stage"],
             ["alternance", "Alternance"],
+            ["graduate", "Graduate program"],
           ] as const
         ).map(([id, label]) => {
           const prefs = profile.preferred_contracts ?? ["cdi", "cdd"];
