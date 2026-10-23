@@ -10,7 +10,7 @@ import { listSpontaneous, setAutoResult } from "@/lib/db/spontanees";
 import { SPONTANEOUS_SOURCE } from "@/lib/mail/contacts-file";
 import { findApplyEmail, isEmail } from "@/lib/mail/contact";
 import { mailDraft } from "@/lib/mail/draft";
-import { getMailConfig, sendMail } from "@/lib/mail/send";
+import { claimSend, getMailConfig, releaseSend, sendMail } from "@/lib/mail/send";
 import { checkDomain } from "@/lib/mail/dns-check";
 import { detectDocLanguage, sourceLanguageHint } from "@/lib/text/lang";
 
@@ -101,27 +101,36 @@ async function applyOne(item: AutoItem): Promise<void> {
   // Dernier contrôle avant l'envoi : une candidature enregistrée entre-temps (envoi manuel) ne doit pas être doublée.
   if (getDb().prepare("SELECT 1 FROM candidatures WHERE offre_id = ?").get(item.id)) throw new SkipError("Déjà candidaté.");
 
-  const draft = mailDraft({
-    lang: detectDocLanguage(offre.title, offre.description_text, sourceLanguageHint(offre.source, offre.raw_payload), offre.country),
-    title: offre.title,
-    company: offre.company,
-    fullName: profile.full_name ?? "",
-    phone: profile.phone,
-    email: profile.email,
-    spontaneous: item.kind === "spontanees",
-  });
-  await sendMail({
-    to: item.email,
-    subject: draft.subject,
-    text: draft.body,
-    attachments: [cv, lm].map((d) => ({
-      filename: buildDocFilename({ type: d.type, format: d.format, fullName: profile.full_name ?? null, title: offre.title }),
-      path: d.file_path,
-    })),
-  });
-  // Le mail est parti : on enregistre tout de suite.
-  const id = createCandidature({ offre_id: item.id, cv_doc_id: cv.id, lm_doc_id: lm.id, status: "envoyee", contact: item.email });
-  updateCandidature(id, { status: "envoyee", contact: item.email });
+  if (!claimSend(item.id)) throw new SkipError("Envoi déjà en cours pour cette offre.");
+  try {
+    const draft = mailDraft({
+      lang: detectDocLanguage(offre.title, offre.description_text, sourceLanguageHint(offre.source, offre.raw_payload), offre.country),
+      title: offre.title,
+      company: offre.company,
+      fullName: profile.full_name ?? "",
+      phone: profile.phone,
+      email: profile.email,
+      spontaneous: item.kind === "spontanees",
+    });
+    await sendMail({
+      to: item.email,
+      subject: draft.subject,
+      text: draft.body,
+      attachments: [cv, lm].map((d) => ({
+        filename: buildDocFilename({ type: d.type, format: d.format, fullName: profile.full_name ?? null, title: offre.title }),
+        path: d.file_path,
+      })),
+    });
+    // Le mail est parti : on enregistre tout de suite.
+    try {
+      const id = createCandidature({ offre_id: item.id, cv_doc_id: cv.id, lm_doc_id: lm.id, status: "envoyee", contact: item.email });
+      updateCandidature(id, { status: "envoyee", contact: item.email });
+    } catch (e) {
+      throw new Error(`Mail envoyé, mais candidature non enregistrée (${e instanceof Error ? e.message : "erreur base"}) : ajoutez-la à la main.`);
+    }
+  } finally {
+    releaseSend(item.id);
+  }
 }
 
 type Deps = {

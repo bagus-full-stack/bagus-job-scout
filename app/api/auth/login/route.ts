@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const password = typeof body?.password === "string" ? body.password : "";
   if (!password || !timingSafeEqual(digest(password), digest(accessPassword()))) {
+    for (const [k, v] of failures) if (v.resetAt <= now) failures.delete(k); // sinon la table ne fait que grossir
     const cur = f && f.resetAt > now ? f : { count: 0, resetAt: now + WINDOW_MS };
     failures.set(key, { count: cur.count + 1, resetAt: cur.resetAt });
     await new Promise((r) => setTimeout(r, 600)); // ralentit aussi les essais sous la limite

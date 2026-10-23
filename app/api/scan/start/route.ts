@@ -6,6 +6,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 600;
 
+// Un seul scan à la fois dans ce processus : deux scans en parallèle doublent le trafic vers les sites (blocages)
+// et mélangent les écritures en base.
+const g = globalThis as { __jobscoutScanRunning?: boolean };
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const onlySource = searchParams.get("source")?.toLowerCase() ?? null;
@@ -30,6 +34,14 @@ export async function GET(req: NextRequest) {
       const send = (data: unknown) => write(`data: ${JSON.stringify(data)}\n\n`);
       const log = (line: string) => send({ kind: "log", line });
 
+      if (g.__jobscoutScanRunning) {
+        send({ kind: "error", source: "orchestrator", message: "Un scan est déjà en cours." });
+        send({ kind: "close" });
+        controller.close();
+        return;
+      }
+      g.__jobscoutScanRunning = true;
+
       // 1. Force-flush 2KB of SSE comment so Next.js / proxies stop buffering immediately.
       //    Comments (lines starting with ":") are ignored by EventSource clients.
       write(`: ${" ".repeat(2048)}\n\n`);
@@ -52,6 +64,7 @@ export async function GET(req: NextRequest) {
           message: e instanceof Error ? e.message : String(e),
         });
       } finally {
+        g.__jobscoutScanRunning = false;
         clearInterval(heartbeat);
         send({ kind: "close" });
         if (!clientGone) {
