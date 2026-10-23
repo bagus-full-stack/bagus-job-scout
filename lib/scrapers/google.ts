@@ -115,6 +115,13 @@ export function wanted(url: string, sites: string[], web: boolean): boolean {
 const SOCIAL_TITLE = /^(.*?)\s+(?:on|sur)\s+(?:LinkedIn|X|Twitter)\s*:\s*(.*)$/i;
 const unquote = (s: string) => s.replace(/\s*\/\s*X\s*$/i, "").replace(/^["“«\s]+|["”»\s]+$/g, "");
 
+/** Même page, sans les paramètres de suivi (utm_*, gclid, fbclid, ref) : deux liens vers elle ne font qu'une offre. Les autres paramètres (ex. ?id=12) restent. */
+function withoutTracking(url: string): string {
+  const u = new URL(url);
+  for (const k of [...u.searchParams.keys()]) if (/^(utm_|gclid$|fbclid$|ref$)/i.test(k)) u.searchParams.delete(k);
+  return u.toString();
+}
+
 export function parseItem(it: Item): ScrapedOffre | null {
   const url = (it.link ?? "").split("#")[0];
   const u = hostOf(url);
@@ -126,8 +133,8 @@ export function parseItem(it: Item): ScrapedOffre | null {
   let company: string;
   let id = url;
   if (social) {
-    // Un profil ou une page n'est pas une annonce : seuls les posts comptent.
-    if (social === "LinkedIn" ? !u.path.startsWith("/posts/") : !/\/status\/\d+/.test(u.path)) return null;
+    // Un profil X n'est pas une annonce : seuls les posts comptent. Pour LinkedIn, le chemin saisi dans la liste décide (wanted).
+    if (social === "X" && !/\/status\/\d+/.test(u.path)) return null;
     kind = social.toLowerCase();
     id = url.split("?")[0];
     const m = SOCIAL_TITLE.exec(full);
@@ -141,6 +148,7 @@ export function parseItem(it: Item): ScrapedOffre | null {
     company = `r/${/\/r\/(\w+)\//i.exec(u.path)?.[1] ?? "reddit"}`;
   } else {
     kind = "web";
+    id = withoutTracking(url);
     title = full || u.host;
     company = u.host;
   }

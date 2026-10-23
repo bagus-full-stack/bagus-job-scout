@@ -30,8 +30,12 @@ describe("parseItem", () => {
   it("comprend le titre anglais « on LinkedIn: »", () => {
     expect(parseItem(item({ title: "John Doe on LinkedIn: We are hiring" }))).toMatchObject({ company: "John Doe", title: "We are hiring" });
   });
-  it("ignore ce qui n'est pas un post LinkedIn", () => {
-    expect(parseItem(item({ link: "https://www.linkedin.com/in/marie-curie" }))).toBeNull();
+  it("LinkedIn : le chemin saisi dans la liste décide, pas seulement /posts", () => {
+    const job = "https://www.linkedin.com/jobs/view/123";
+    expect(wanted("https://www.linkedin.com/in/marie-curie", ["linkedin.com/posts"], false)).toBe(false);
+    expect(wanted(job, ["linkedin.com/posts"], false)).toBe(false);
+    expect(wanted(job, ["linkedin.com/jobs"], false)).toBe(true);
+    expect(parseItem(item({ link: job }))).toMatchObject({ source_id: job, raw_payload: { kind: "linkedin" } });
   });
   it("marque « failed » un extrait trop court", () => {
     expect(parseItem(item({ snippet: "Court." }))).toMatchObject({ description_status: "failed" });
@@ -60,6 +64,14 @@ describe("parseItem : X, Reddit, pages d'entreprises", () => {
       company: "acme-tech.fr",
       raw_payload: { kind: "web" },
     });
+  });
+});
+
+describe("parseItem : doublons de pages d'entreprise", () => {
+  it("ignore les paramètres de suivi, garde les autres", () => {
+    const id = (link: string) => parseItem({ title: "t", link, snippet: SNIPPET })!.source_id;
+    expect(id("https://acme-tech.fr/jobs/dev?utm_source=x&gclid=1&ref=y")).toBe(id("https://acme-tech.fr/jobs/dev"));
+    expect(id("https://acme-tech.fr/jobs?id=1")).not.toBe(id("https://acme-tech.fr/jobs?id=2"));
   });
 });
 
