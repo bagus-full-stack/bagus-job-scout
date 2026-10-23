@@ -2,9 +2,9 @@
 
 Trouvez des offres d'emploi grâce à un scan multi-plateformes, triez-les avec un score calculé sur votre vrai profil, et générez pour chacune un CV et une lettre de motivation d'une page (compatibles ATS), sans jamais inventer une compétence que vous n'avez pas.
 
-Tout tourne sur votre machine : base SQLite locale, serveur limité à `127.0.0.1`, aucun compte à créer (une version hébergée protégée par mot de passe est possible : [Hébergement en ligne](#hébergement-en-ligne)). Seuls sortent les recherches envoyées aux sites d'offres pendant un scan et, si vous utilisez une IA en ligne, les textes transmis au fournisseur que vous avez choisi, plus quelques requêtes techniques ([détail](CONFIDENTIALITE.md)).
+Tout tourne sur votre machine : base SQLite locale, serveur limité à `127.0.0.1`, aucun compte à créer (une version hébergée protégée par mot de passe est possible : [Hébergement en ligne](#hébergement-en-ligne)). Seuls sortent les recherches envoyées aux sites d'offres pendant un scan et, si vous utilisez une IA en ligne, les textes transmis au fournisseur que vous avez choisi, plus quelques requêtes techniques ([détail](#confidentialité-et-conditions-dutilisation)).
 
-> Site et guide de démarrage : **https://latenightsbeats1208-pixel.github.io/jobscout/** · [Installation](INSTALL.md) · [Installation sur Mac](INSTALL-MAC.md) · [Guide de l'IA](GUIDE-IA.md) · [Conditions d'utilisation](CGU.md) · [Confidentialité](CONFIDENTIALITE.md)
+> Site et guide de démarrage : **https://latenightsbeats1208-pixel.github.io/jobscout/** · [Installation](#installation) · [Installation sur Mac](#installation-sur-mac) · [Choisir une IA](#choisir-une-ia) · [Confidentialité et conditions d'utilisation](#confidentialité-et-conditions-dutilisation)
 >
 > **En vidéo**, moins de 2 minutes chacune : [1. Installation](https://youtu.be/cIh4PSmPlKE) · [2. Mise en place](https://youtu.be/gOMQkcsD6LA) · [3. Utilisation](https://youtu.be/45uLxsWXXLQ)
 
@@ -12,18 +12,16 @@ Tout tourne sur votre machine : base SQLite locale, serveur limité à `127.0.0.
 
 - **Next.js 15** (App Router) + **React 19** + **TypeScript** + **Tailwind**
 - **IA au choix** — Anthropic Claude (référence : Opus 4.8 pour la rédaction, Sonnet 5 pour la relecture), OpenAI, Google Gemini, Mistral, DeepSeek, Groq, OpenRouter, Ollama et LM Studio en local, ou tout serveur compatible OpenAI. Deux modèles par fournisseur : un de **rédaction** (extraction du CV, CV, lettre, message V.I.E) et un de **relecture** (relecture, traduction anglaise, réparation ciblée de la lettre). Couche commune : `lib/ai/llm.ts` ; catalogue : `lib/ai/providers.ts`.
-- **Tests** : Vitest (`npm test`) et intégration continue GitHub Actions (types, tests, build sur Windows, Linux et macOS à puce Apple avec Node 22, 24 et 26, et sur Mac Intel avec Node 24 ; sur les deux types de Mac, le parcours du [guide Mac](INSTALL-MAC.md) est rejoué : `npm ci`, démarrage, moteur LinkedIn installé puis lancé, lanceur)
+- **Tests** : Vitest (`npm test`) et intégration continue GitHub Actions (types, tests, build sur Windows, Linux et macOS à puce Apple avec Node 22, 24 et 26, et sur Mac Intel avec Node 24 ; sur les deux types de Mac, le parcours d'[installation sur Mac](#installation-sur-mac) est rejoué : `npm ci`, démarrage, moteur LinkedIn installé puis lancé, lanceur)
 - **SQLite** intégré (`node:sqlite`, WAL) + fichiers locaux
 - **Scraping** : `fetch` + parsing DOM (`jsdom`) + JSON-LD `JobPosting` ; Playwright uniquement pour LinkedIn
 - **@react-pdf/renderer** + **docx** pour les documents générés ; **xlsx** pour l'import/export des candidatures
 
 ## Installation
 
-> **Première installation ? Suivez le [guide pas à pas](INSTALL.md)** : prérequis, durée de chaque étape (mesurée), messages normaux, ordinateur à laisser allumé ou non, problèmes fréquents.
+> **Première installation ?** Les prérequis, les commandes et les messages normaux sont ci-dessous. Sur Mac, voir [Installation sur Mac](#installation-sur-mac).
 >
-> **Sur Mac ? Suivez le [guide Mac](INSTALL-MAC.md)** : les mêmes étapes, avec les gestes du Mac (Terminal, installeur de Node.js, lanceur à double-cliquer).
->
-> En vidéo : [installation](https://youtu.be/cIh4PSmPlKE) · [mise en place](https://youtu.be/gOMQkcsD6LA) · [utilisation](https://youtu.be/45uLxsWXXLQ). Elles ont été tournées sous Windows ; sur Mac, [le guide Mac dit ce qui s'y applique](INSTALL-MAC.md#les-tutoriels-vidéo-sur-mac).
+> En vidéo : [installation](https://youtu.be/cIh4PSmPlKE) · [mise en place](https://youtu.be/gOMQkcsD6LA) · [utilisation](https://youtu.be/45uLxsWXXLQ). Elles ont été tournées sous Windows ; les gestes sont les mêmes sur Mac, avec le Terminal à la place de PowerShell.
 >
 > En résumé (repères établis sous Windows) : **environ 10 à 20 minutes au total avec les réglages par défaut (jusqu'à 35 si vous activez d'autres sources), dont 10 à 15 devant l'écran**. `npm ci` prend environ 1 minute ; le premier scan dure 1 à 3 minutes avec France Travail seule, 10 à 20 minutes avec toutes les sources. Pendant ce temps, l'ordinateur doit rester allumé (hors veille), le terminal ouvert.
 
@@ -36,9 +34,9 @@ npm ci
 npm run dev
 ```
 
-L'app démarre sur http://127.0.0.1:3000 (écoute limitée à la machine locale, rien n'est exposé au réseau). Sous Windows, `scripts/Start-JobScout.ps1` lance le serveur de développement et ouvre le navigateur. Sur Mac, `npm run shortcut:mac` (après `npm ci`) crée un lanceur `JobScout.command` dans le dossier du projet, avec une copie sur le Bureau : un double-clic ouvre le Terminal, démarre JobScout avec `caffeinate -i` (pas de mise en veille automatique tant qu'il tourne) et ouvre http://127.0.0.1:3000 dès qu'il répond ([guide Mac](INSTALL-MAC.md)).
+L'app démarre sur http://127.0.0.1:3000 (écoute limitée à la machine locale, rien n'est exposé au réseau). Sous Windows, `scripts/Start-JobScout.ps1` lance le serveur de développement et ouvre le navigateur. Sur Mac, `npm run shortcut:mac` (après `npm ci`) crée un lanceur `JobScout.command` dans le dossier du projet, avec une copie sur le Bureau : un double-clic ouvre le Terminal, démarre JobScout avec `caffeinate -i` (pas de mise en veille automatique tant qu'il tourne) et ouvre http://127.0.0.1:3000 dès qu'il répond (voir [Installation sur Mac](#installation-sur-mac)).
 
-**IA à configurer dès l'inscription** : l'onboarding lit votre CV avec un modèle d'IA pour créer le profil. Pas à pas, pour une clé payante ou une IA gratuite en local (Ollama, LM Studio) : [guide de l'IA](GUIDE-IA.md). Dans l'écran « Génération IA », choisissez votre fournisseur et collez votre clé :
+**IA à configurer dès l'inscription** : l'onboarding lit votre CV avec un modèle d'IA pour créer le profil ([Choisir une IA](#choisir-une-ia)). Dans l'écran « Génération IA », choisissez votre fournisseur et collez votre clé :
 
 | Fournisseur | Clé | Remarque |
 |---|---|---|
@@ -59,11 +57,29 @@ L'app démarre sur http://127.0.0.1:3000 (écoute limitée à la machine locale,
 
 **Messages npm normaux** : `npm warn deprecated node-domexception`, « packages are looking for funding », et, avec npm récent, le script d'installation de `tesseract.js` ignoré (il n'affiche qu'un appel aux dons). `npm audit --omit=dev`, qui ne regarde que ce qui tourne réellement, doit afficher `found 0 vulnerabilities` (le PostCSS embarqué par Next.js est forcé en version corrigée via `overrides`). `npm audit` complet signale des failles dans des outils de développement (Tailwind CSS et ses dépendances), sans effet sur l'application. **Ne lancez jamais `npm audit fix --force`** : il installerait Tailwind CSS 4, incompatible.
 
+## Installation sur Mac
+
+Mêmes étapes que ci-dessus, avec les gestes du Mac :
+
+1. Installez **Node.js ≥ 22.13** avec l'installeur `.pkg` de nodejs.org, puis vérifiez dans le Terminal (⌘ + Espace, « Terminal ») : `node -v`.
+2. Récupérez le projet (`git clone …` ou le ZIP du dépôt), puis dans le dossier : `npm ci`.
+3. Lancez `npm run dev`, ou `npm run shortcut:mac` pour créer le lanceur `JobScout.command` (double-clic = Terminal + serveur + navigateur, sans veille tant qu'il tourne).
+4. « Ctrl + V » se lit ⌘V, « Ctrl + C » (arrêt) reste `Ctrl + C`. Les données restent dans le dossier `jobscout/data`.
+
+Une IA locale (Ollama, LM Studio) demande **macOS 14 Sonoma ou plus récent** ; LM Studio, une puce Apple. Sur un Mac plus ancien, prenez une IA en ligne. Pour tout effacer : supprimez le dossier du projet et, si vous l'aviez installé, `~/.ollama` (les modèles pèsent plusieurs Go ; mettre l'application à la Corbeille ne suffit pas).
+
 ## Paquet Windows
 
-`npm run package` produit `installer/output/JobScout_Setup_v<version>.exe` : un installeur autonome (Node 22 LTS embarqué, aucune dépendance sur la machine cible), avec launcher natif, données sous `%LOCALAPPDATA%\JobScout` et contrôle anti-fuite de données personnelles bloquant. Voir [`installer/README.md`](installer/README.md).
+`npm run package` produit `installer/output/JobScout_Setup_v<version>.exe` : un installeur autonome (Node 22 LTS embarqué, aucune dépendance sur la machine cible), avec launcher natif, données sous `%LOCALAPPDATA%\JobScout` et contrôle anti-fuite de données personnelles bloquant.
 
-**Windows uniquement** : la commande a besoin d'Inno Setup 6 (`ISCC.exe`) et embarque un Node pour Windows (`win-x64`). Sur Mac ou Linux, elle échoue après la compilation de Next.js. Sur Mac, JobScout se lance depuis les sources : voir le [guide Mac](INSTALL-MAC.md).
+**Windows uniquement** : la commande a besoin d'Inno Setup 6 (`ISCC.exe`) et embarque un Node pour Windows (`win-x64`). Sur Mac ou Linux, elle échoue après la compilation de Next.js. Sur Mac, JobScout se lance depuis les sources (voir ci-dessus).
+
+## Choisir une IA
+
+JobScout en a besoin pour lire votre CV puis rédiger CV et lettres. Deux voies :
+
+- **Clé chez un fournisseur en ligne** (tableau ci-dessus) : créez la clé sur sa console (le bouton « Créer une clé » de Profil › Génération IA ouvre la bonne page), collez-la, « Charger la liste », « Vérifier ». Claude (Anthropic) est la référence ; Gemini a une offre gratuite limitée.
+- **IA locale, gratuite** : installez Ollama ou LM Studio, téléchargez un modèle (par exemple `ollama pull qwen3.5:9b`), puis choisissez-le dans « Génération IA » (adresse `http://127.0.0.1:11434` pour Ollama). Ollama : refusez le compte et les modèles « cloud », et réglez `OLLAMA_CONTEXT_LENGTH=16384` puis relancez-le. Si c'est lent, vérifiez que le modèle tourne bien sur la carte graphique (ou la puce Apple), sinon prenez un modèle plus petit (`qwen3.5:4b`).
 
 ## Sources de scan
 
@@ -78,7 +94,7 @@ L'app démarre sur http://127.0.0.1:3000 (écoute limitée à la machine locale,
 | APEC | — | France (cadres) | **suspendue** : le site bloque désormais les requêtes automatiques |
 | Civiweb (V.I.E) | — | International | **suspendue** : Business France exige désormais une authentification que JobScout ne gère pas |
 
-**Avant d'activer une source, lisez les [conditions d'utilisation](CGU.md) (sections 5 et 6)** : les conditions de Welcome to the Jungle, HelloWork, Talent.com et LinkedIn interdisent l'extraction automatisée. C'est pourquoi, depuis la 3.4.13, seule France Travail est cochée d'office. Chaque source s'active ou se désactive dans Profil › Recherche › Sources (ou à l'étape Préférences de l'onboarding). Une source suspendue n'est jamais interrogée, même si elle est restée cochée dans un ancien profil. Une source hors périmètre géographique (ex. HelloWork quand le profil ne cible pas la France) est automatiquement sautée. **Profondeur de recherche** (Profil › Profondeur de recherche) : nombre de pages de résultats parcourues par intitulé cible et par source, de 1 à 10 (5 par défaut) ; le plafond d'offres par source suit la même proportion. Plus c'est profond, plus le scan est long et plus les sites risquent de limiter les requêtes (LinkedIn surtout). La disponibilité des sources dépend des sites tiers (anti-bot, changements d'API) ; une source en échec est signalée dans le journal du scan.
+**Avant d'activer une source, lisez [Confidentialité et conditions d'utilisation](#confidentialité-et-conditions-dutilisation)** : les conditions de Welcome to the Jungle, HelloWork, Talent.com et LinkedIn interdisent l'extraction automatisée. C'est pourquoi, depuis la 3.4.13, seule France Travail est cochée d'office. Chaque source s'active ou se désactive dans Profil › Recherche › Sources (ou à l'étape Préférences de l'onboarding). Une source suspendue n'est jamais interrogée, même si elle est restée cochée dans un ancien profil. Une source hors périmètre géographique (ex. HelloWork quand le profil ne cible pas la France) est automatiquement sautée. **Profondeur de recherche** (Profil › Profondeur de recherche) : nombre de pages de résultats parcourues par intitulé cible et par source, de 1 à 10 (5 par défaut) ; le plafond d'offres par source suit la même proportion. Plus c'est profond, plus le scan est long et plus les sites risquent de limiter les requêtes (LinkedIn surtout). La disponibilité des sources dépend des sites tiers (anti-bot, changements d'API) ; une source en échec est signalée dans le journal du scan.
 
 WTTJ est interrogée avec la clé de recherche (lecture seule) qu'utilise l'interface du site. Si elle cesse de fonctionner, décochez la source.
 
@@ -134,14 +150,14 @@ Coût : avec Claude (Anthropic), environ 0,12 à 0,20 $ par dossier (CV + lettre
 - **Poste visé par contact** : saisi à la main, ou choisi par l'IA d'après l'adresse et le nom de l'entreprise (`lib/ai/choose-role.ts`) ; le CV est généré pour ce poste.
 
 ## Hébergement en ligne
-Optionnel. `JOBSCOUT_HOSTED=1` protège tout le site (pages et API) par un mot de passe unique, `JOBSCOUT_ACCESS_PASSWORD`, sans compte utilisateur ; sans lui, le serveur ne sert rien. En local, rien ne change. Image Docker (avec Chromium), `compose.yml` et Caddy (HTTPS), workflow GitHub Actions qui publie l'image sur ghcr.io (amd64 et arm64) puis met le serveur à jour par SSH. Guide complet : [`DEPLOIEMENT.md`](DEPLOIEMENT.md).
+Optionnel. `JOBSCOUT_HOSTED=1` protège tout le site (pages et API) par un mot de passe unique, `JOBSCOUT_ACCESS_PASSWORD`, sans compte utilisateur ; sans lui, le serveur ne sert rien. En local, rien ne change. Image Docker (avec Chromium), `compose.yml` et Caddy (HTTPS), workflow GitHub Actions qui publie l'image sur ghcr.io (amd64 et arm64) puis met le serveur à jour par SSH. Sur le serveur : copiez `compose.yml` et un fichier `.env` voisin (`JOBSCOUT_HOSTED=1`, `JOBSCOUT_ACCESS_PASSWORD`, nom de domaine pour Caddy), puis `docker compose up -d`. Les variables `DEPLOY_HOST` et les secrets SSH du dépôt activent la mise à jour automatique (`.github/workflows/deploy.yml`).
 
 ## Sécurité
 
 - Serveur limité à `127.0.0.1` ; l'API refuse les requêtes venant d'un autre site ou d'un hôte non local (`middleware.ts`)
-- Version hébergée : mot de passe d'accès, session signée (`HttpOnly`, 7 jours), 5 essais par 15 minutes, actions réservées au poste local désactivées (voir [`DEPLOIEMENT.md`](DEPLOIEMENT.md))
+- Version hébergée : mot de passe d'accès, session signée (`HttpOnly`, 7 jours), 5 essais par 15 minutes, actions réservées au poste local désactivées
 - Clés IA stockées en clair dans la base locale, jamais renvoyées au navigateur (seuls les 4 derniers caractères sont affichés)
-- Aucune télémétrie : JobScout n'envoie rien à son éditeur, et les scripts de lancement (`npm run dev`, `npm run build`) coupent celle de Next.js (`scripts/next.mjs`) — voir [Confidentialité](CONFIDENTIALITE.md)
+- Aucune télémétrie : JobScout n'envoie rien à son éditeur, et les scripts de lancement (`npm run dev`, `npm run build`) coupent celle de Next.js (`scripts/next.mjs`)
 - Whitelist de colonnes sur la mise à jour des candidatures (anti mass-assignment)
 - Bornage des chemins d'écriture du dossier documents ; ouverture de dossier restreinte au dossier configuré
 - Descriptions d'offres assainies (DOMPurify) ; `rel="noopener noreferrer"` sur tous les liens sortants
@@ -167,6 +183,23 @@ Test réel optionnel avec votre propre fournisseur (appels facturés par lui, qu
 JOBSCOUT_LIVE=1 JOBSCOUT_LIVE_PROVIDER=openai JOBSCOUT_LIVE_KEY=sk-... npx vitest run tests/live
 ```
 
+## Confidentialité et conditions d'utilisation
+
+**Ce qui reste chez vous** : profil, offres, documents, candidatures et clés API sont dans la base locale (`data/`, ou `%LOCALAPPDATA%\JobScout` avec l'installeur Windows). L'éditeur de JobScout ne reçoit rien et il n'y a aucune télémétrie. Pour tout effacer : fermez JobScout, supprimez ce dossier (et le dossier des documents si vous en avez choisi un autre).
+
+**Ce qui sort, et vers qui**
+- Les **sites d'offres** que vous activez reçoivent vos mots-clés, vos pays cibles et votre adresse IP pendant un scan.
+- **Recrutement sur le web (via Google)** : `serpapi.com` (ou `SERPAPI_URL`) reçoit vos intitulés de poste et votre clé ; SerpAPI interroge Google pour vous, ni LinkedIn, ni X, ni Reddit, ni les sites d'entreprises ne sont contactés. Source à activer vous-même, après avoir saisi la clé.
+- Le **fournisseur d'IA** que vous choisissez reçoit le texte de votre CV à l'import, puis votre profil (identité comprise) et l'offre à chaque génération. Aucun envoi avec un modèle local.
+- Les **modèles de reconnaissance d'image** (`cdn.jsdelivr.net`, une fois) et les requêtes de mise à jour ou de géolocalisation de villes ne contiennent aucune donnée sur vous.
+- La **messagerie** : vos candidatures partent par le serveur SMTP que vous avez renseigné ; son mot de passe est chiffré (AES-256-GCM) dans la base locale.
+
+**Conditions d'utilisation**
+- JobScout est gratuit (MIT) et fourni sans garantie. Vous restez responsable de l'usage que vous en faites et de ce que vous envoyez aux recruteurs.
+- Les conditions de Welcome to the Jungle, HelloWork, Talent.com et LinkedIn **interdisent l'extraction automatisée** : seule France Travail est cochée d'office, et activer une autre source est votre choix et votre responsabilité. Les offres collectées servent à votre propre recherche d'emploi, pas à être revendues ou republiées.
+- Pour une recherche menée pour vous-même, le RGPD ne s'applique en principe pas (usage strictement personnel) ; si vous utilisez JobScout pour d'autres personnes ou dans un cadre professionnel, il peut s'appliquer à vous.
+- Vérifiez toujours les CV et lettres générés avant envoi : l'IA peut se tromper, même avec les garde-fous anti-invention.
+
 ## Licence
 
 MIT — voir [`LICENSE`](LICENSE). Les marques des sites scannés appartiennent à leurs propriétaires ; JobScout n'est affilié à aucun d'eux.
@@ -177,5 +210,3 @@ Composants tiers embarqués, avec leurs propres licences : polices DM Sans et Pl
 - `geo-world.json.gz` (villes et pays du monde) : villes et pays de GeoNames (CC BY 4.0, données modifiées), noms français des pays de l'INSEE (Licence Ouverte 2.0).
 
 Sources, dates, modifications et textes de licence : [`THIRD_PARTY_NOTICES.txt`](THIRD_PARTY_NOTICES.txt).
-
-Utilisation : [conditions générales d'utilisation](CGU.md). Données personnelles : [politique de confidentialité](CONFIDENTIALITE.md).

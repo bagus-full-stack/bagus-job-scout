@@ -39,7 +39,7 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
 
-  # Le parcours du guide d'installation Mac (INSTALL-MAC.md), sur une machine vierge :
+  # Le parcours du guide d'installation Mac (README, « Installation sur Mac »), sur une machine vierge :
   # npm ci, npm run dev, pages de l'application, moteur LinkedIn installé par le bouton
   # de l'application puis lancé, lanceur « npm run shortcut:mac ».
   installation-macos:

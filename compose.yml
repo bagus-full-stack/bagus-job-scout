@@ -1,4 +1,4 @@
-# Serveur : docker compose up -d   (variables dans le fichier .env voisin, voir DEPLOIEMENT.md)
+# Serveur : docker compose up -d   (variables dans le fichier .env voisin, voir « Hébergement en ligne » dans le README)
 services:
   jobscout:
     image: ghcr.io/bagus-full-stack/bagus-job-scout:latest

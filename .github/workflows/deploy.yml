@@ -1,7 +1,7 @@
 name: Déploiement
 
 # Après des tests réussis sur main : image Docker publiée sur GitHub (ghcr.io), puis, si le serveur est
-# configuré (variable DEPLOY_HOST), mise à jour par SSH. Voir DEPLOIEMENT.md.
+# configuré (variable DEPLOY_HOST), mise à jour par SSH. Voir « Hébergement en ligne » dans le README.
 on:
   workflow_run:
     workflows: [Tests]

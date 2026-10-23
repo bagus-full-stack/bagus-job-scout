@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 
 if (process.platform !== "darwin") {
-  console.error("Ce lanceur est réservé à macOS. Sous Windows : scripts\\Install-DesktopShortcut.ps1 (voir INSTALL.md).");
+  console.error("Ce lanceur est réservé à macOS. Sous Windows : scripts\\Install-DesktopShortcut.ps1 (voir le README).");
   process.exit(1);
 }
 const project = process.cwd();

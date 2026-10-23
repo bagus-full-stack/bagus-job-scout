@@ -150,7 +150,7 @@ export function renderInstallInfo({ appName, dataDirName, version, signed, sizes
     "RÉSEAU",
     "  - Le serveur local n'écoute que sur 127.0.0.1 : rien n'est exposé sur le réseau.",
     "  - Connexions sortantes uniquement pour scanner les sites d'offres et pour le",
-    "    service d'IA si vous l'avez configuré. Voir CONFIDENTIALITE.md dans le dépôt.",
+    "    service d'IA si vous l'avez configuré. Voir la section Confidentialité du README dans le dépôt.",
   ];
 
   if (!signed) {

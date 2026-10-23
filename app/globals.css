@@ -10,7 +10,7 @@
  *  - l'ENCRE (--accent-ink, --success-ink…) sert au TEXTE : ≥ 4,5:1 sur la surface,
  *    au survol et sur un fond teinté à 12 % de la couleur vive, en clair comme en
  *    sombre. tailwind.config.ts la branche sur text-accent, text-success, etc.
- * Ratios recalculés à chaque changement : voir docs/design-direction.md.
+ * Ratios recalculés à chaque changement .
  */
 :root {
   color-scheme: light;

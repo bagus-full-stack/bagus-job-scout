@@ -1,4 +1,4 @@
-# Version hébergée de JobScout (voir DEPLOIEMENT.md). Construit avec : docker build -t jobscout .
+# Version hébergée de JobScout (voir « Hébergement en ligne » dans le README). Construit avec : docker build -t jobscout .
 FROM node:24-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./

@@ -21,7 +21,7 @@ export type SourceMeta = {
   unavailable?: boolean;
   /**
    * Les conditions du site interdisent l'extraction automatisée : la source reste décochée
-   * par défaut et ne s'active que par un choix explicite de l'utilisateur (CGU.md, § 5 et 6).
+   * par défaut et ne s'active que par un choix explicite de l'utilisateur (README, « Confidentialité et conditions d'utilisation »).
    */
   optIn?: boolean;
 };

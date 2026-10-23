@@ -253,7 +253,7 @@ export function PreferencesForm() {
           Plateformes scannées à chaque recherche. Seule France Travail est cochée d'office : les
           conditions des autres sites interdisent l'extraction automatisée — lisez les{" "}
           <a
-            href="https://github.com/latenightsbeats1208-pixel/jobscout/blob/main/CGU.md"
+            href="https://github.com/latenightsbeats1208-pixel/jobscout/blob/main/README.md#confidentialit%C3%A9-et-conditions-dutilisation"
             target="_blank"
             rel="noopener noreferrer"
             className="underline"
