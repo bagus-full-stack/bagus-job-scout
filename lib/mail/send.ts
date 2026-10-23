@@ -28,7 +28,7 @@ export async function sendMail(args: {
   attachments: { filename: string; path: string }[];
 }) {
   const c = getMailConfig();
-  if (!c) throw new Error("Messagerie non configurée : renseignez le serveur SMTP.");
+  if (!c) throw new Error("Messagerie non configurée : renseignez-la dans Profil › Messagerie.");
   const transport = nodemailer.createTransport({
     host: c.host,
     port: c.port,

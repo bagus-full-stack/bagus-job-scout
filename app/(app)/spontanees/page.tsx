@@ -9,6 +9,7 @@ import { RoleEditor, BulkRole } from "./role-editor";
 import { getProfile } from "@/lib/db/queries";
 import { VerifyButton } from "./verify-button";
 import { AiRoleButton } from "./ai-role-button";
+import { AutoPanel } from "./auto-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,8 @@ export default async function SpontaneesPage({ searchParams }: { searchParams: P
         </div>
       ) : (
         <>
-        <BulkRole options={roles} />
+        <AutoPanel />
+      <BulkRole options={roles} />
         <ul className="glass-panel divide-y divide-border">
           {contacts.map((c) => (
             <li key={c.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
@@ -79,6 +81,7 @@ export default async function SpontaneesPage({ searchParams }: { searchParams: P
                 {c.dns === "invalid" && <Badge variant="danger">Domaine injoignable</Badge>}
                 {c.dns === "unknown" && <Badge variant="warning">Non vérifié</Badge>}
                 {c.status && <Badge>{STATUS_LABELS[c.status] ?? c.status}</Badge>}
+                {!c.status && c.auto_error && <Badge variant="danger" title={c.auto_error}>Échec de l'envoi auto</Badge>}
               </div>
               <Link
                 href={`/offres/${c.id}`}

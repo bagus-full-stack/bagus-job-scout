@@ -18,6 +18,8 @@ export type SpontaneousContact = {
   /** « manual » : choisi par l'utilisateur (jamais écrasé par l'IA) ; « ai » : choisi par l'IA ; null : poste par défaut. */
   role_source: "manual" | "ai" | null;
   role_reason: string | null;
+  /** Dernier échec de l'envoi automatique (null : aucun, ou réussi depuis). */
+  auto_error: string | null;
 };
 
 export function listSpontaneous(): SpontaneousContact[] {
@@ -29,11 +31,19 @@ export function listSpontaneous(): SpontaneousContact[] {
         (SELECT status FROM candidatures WHERE offre_id = o.id LIMIT 1) AS status,
         CASE WHEN json_valid(o.raw_payload) THEN json_extract(o.raw_payload, '$.dns.status') END AS dns,
         CASE WHEN json_valid(o.raw_payload) THEN json_extract(o.raw_payload, '$.role_source') END AS role_source,
-        CASE WHEN json_valid(o.raw_payload) THEN json_extract(o.raw_payload, '$.role_reason') END AS role_reason
+        CASE WHEN json_valid(o.raw_payload) THEN json_extract(o.raw_payload, '$.role_reason') END AS role_reason,
+              CASE WHEN json_valid(o.raw_payload) THEN json_extract(o.raw_payload, '$.auto_error') END AS auto_error
        FROM offres o WHERE o.source = ? ORDER BY o.scraped_at DESC, o.id DESC`
     )
     .all(SPONTANEOUS_SOURCE)
     .map((r) => ({ ...(r as SpontaneousContact) }));
+}
+
+/** Garde le résultat de l'envoi automatique dans le contact : un message d'échec, ou `null` pour l'effacer. */
+export function setAutoResult(id: number, error: string | null): void {
+  getDb()
+    .prepare(`UPDATE offres SET raw_payload = json_set(${SAFE_JSON}, '$.auto_error', ?) WHERE id = ? AND source = ?`)
+    .run(error, id, SPONTANEOUS_SOURCE);
 }
 
 /** Contrôle DNS des contacts (tous, ou ceux d'`ids`) ; le résultat est gardé dans leur raw_payload. */
