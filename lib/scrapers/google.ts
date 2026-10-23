@@ -9,7 +9,7 @@ import { sleep } from "./dom";
 
 /**
  * Annonces de recrutement trouvées dans les résultats de Google par SerpAPI, sur une liste de sites modifiable
- * (posts LinkedIn au départ ; X, Reddit… au choix) et, en option, sur les pages de recrutement d'entreprises.
+ * (posts LinkedIn et APEC au départ ; X, Reddit… au choix) et, en option, sur les pages de recrutement d'entreprises.
  * JobScout ne contacte jamais ces sites, il ne lit que les extraits que Google a déjà indexés.
  * Chaque page de 10 résultats coûte une recherche sur le compte SerpAPI. L'adresse du service se règle par
  * SERPAPI_URL (par défaut le service public, mais aussi un serveur compatible).
@@ -21,7 +21,7 @@ const MAX_SITES = 10;
 const HIRING = '("recrute" OR "nous recrutons" OR "hiring" OR "we are hiring" OR "offre d\'emploi")';
 const APPLY = '("envoyez votre CV" OR "envoyez votre candidature" OR "send your CV" OR "send your resume")';
 
-export const DEFAULT_SITES = ["linkedin.com/posts"];
+export const DEFAULT_SITES = ["linkedin.com/posts", "apec.fr"];
 
 export const GOOGLE_MISSING_MESSAGE = "SerpAPI non configuré : renseignez la clé API dans Profil › Recrutement sur le web (via Google).";
 

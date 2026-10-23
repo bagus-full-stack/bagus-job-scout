@@ -145,7 +145,7 @@ describe("source Google (SerpAPI)", () => {
   });
 
   it("la liste de sites et le web libre décident des requêtes et de ce qui est gardé", async () => {
-    expect(getSites()).toEqual(["linkedin.com/posts"]); // défaut
+    expect(getSites()).toEqual(["linkedin.com/posts", "apec.fr"]); // défaut
     expect(getWeb()).toBe(false);
     saveTargets(["x.com"], true);
     fetchMock.mockResolvedValue(
