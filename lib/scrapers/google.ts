@@ -8,17 +8,22 @@ import { capOf, pagesOf } from "./pages";
 import { sleep } from "./dom";
 
 /**
- * Posts LinkedIn publics, trouvés dans les résultats de Google par SerpAPI :
- * JobScout ne contacte jamais LinkedIn, il ne lit que les extraits que Google a déjà indexés.
+ * Annonces de recrutement trouvées dans les résultats de Google par SerpAPI, sur une liste de sites modifiable
+ * (posts LinkedIn au départ ; X, Reddit… au choix) et, en option, sur les pages de recrutement d'entreprises.
+ * JobScout ne contacte jamais ces sites, il ne lit que les extraits que Google a déjà indexés.
  * Chaque page de 10 résultats coûte une recherche sur le compte SerpAPI. L'adresse du service se règle par
  * SERPAPI_URL (par défaut le service public, mais aussi un serveur compatible).
  */
 const SOURCE = "google";
 const DEFAULT_API = "https://serpapi.com/search.json";
 const PAGE_SIZE = 10;
+const MAX_SITES = 10;
 const HIRING = '("recrute" OR "nous recrutons" OR "hiring" OR "we are hiring" OR "offre d\'emploi")';
+const APPLY = '("envoyez votre CV" OR "envoyez votre candidature" OR "send your CV" OR "send your resume")';
 
-export const GOOGLE_MISSING_MESSAGE = "SerpAPI non configuré : renseignez la clé API dans Profil › Posts LinkedIn (via Google).";
+export const DEFAULT_SITES = ["linkedin.com/posts"];
+
+export const GOOGLE_MISSING_MESSAGE = "SerpAPI non configuré : renseignez la clé API dans Profil › Recrutement sur le web (via Google).";
 
 /** Clé SerpAPI enregistrée (chiffrée dans la base), ou null. */
 export function getGoogleKey(): string | null {
@@ -30,7 +35,47 @@ export function saveGoogleKey(key: string) {
   setSetting("google:key", encryptSecret(key));
 }
 
+/** « https://www.Reddit.com/ » → « reddit.com » ; null si ce n'est pas un domaine (avec chemin éventuel). Sert aussi à écarter tout ce qui fausserait la requête Google. */
+export function normalizeSite(raw: string): string | null {
+  const s = raw.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "");
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(\/[a-z0-9_\-./]*)?$/.test(s) ? s : null;
+}
+
+/** Sites choisis (liste vide possible si seul le web libre est coché) ; LinkedIn seul tant que rien n'est enregistré. */
+export function getSites(): string[] {
+  try {
+    const raw = JSON.parse(getSetting("google:sites") ?? "null");
+    if (!Array.isArray(raw)) return DEFAULT_SITES;
+    return [...new Set(raw.map((s) => normalizeSite(String(s))).filter((s): s is string => !!s))].slice(0, MAX_SITES);
+  } catch {
+    return DEFAULT_SITES;
+  }
+}
+
+export const getWeb = (): boolean => getSetting("google:web") === "1";
+
+export function saveTargets(sites: string[], web: boolean) {
+  setSetting("google:sites", JSON.stringify(sites));
+  setSetting("google:web", web ? "1" : "0");
+}
+
 const apiUrl = () => process.env.SERPAPI_URL?.trim() || DEFAULT_API;
+
+// Sites d'emploi déjà couverts ailleurs ou qui interdisent l'extraction : jamais dans « pages de recrutement d'entreprises ».
+const BOARD_HOSTS = /(^|\.)(linkedin|x|twitter|reddit|facebook|instagram|indeed|glassdoor|hellowork|talent|welcometothejungle|francetravail|pole-emploi|apec|monster|jobteaser|malt)\.[a-z.]+$/i;
+const WEB_EXCLUDED = ["linkedin.com", "x.com", "twitter.com", "reddit.com", "facebook.com", "instagram.com", "indeed.com", "glassdoor.com"];
+
+/** Requêtes Google pour un intitulé de poste : une pour les sites de la liste (regroupés par OR), une pour le web libre. */
+export function buildQueries(q: string, sites: string[], web: boolean): string[] {
+  const out: string[] = [];
+  if (sites.length) {
+    const list = sites.flatMap((s) => (s === "x.com" ? [s, "twitter.com"] : [s])).map((s) => `site:${s}`);
+    // r/recruitinghell n'annonce rien : écarté d'office quand Reddit est dans la liste.
+    out.push(`(${list.join(" OR ")}) ${HIRING} "${q}"${sites.some((s) => s.startsWith("reddit.com")) ? " -inurl:recruitinghell" : ""}`);
+  }
+  if (web) out.push(`${HIRING} ${APPLY} "${q}" ${WEB_EXCLUDED.map((h) => `-site:${h}`).join(" ")}`);
+  return out;
+}
 
 type Item = { title?: string; link?: string; snippet?: string };
 type SerpResponse = { organic_results?: Item[]; error?: string };
@@ -38,17 +83,69 @@ type SerpResponse = { organic_results?: Item[]; error?: string };
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-/** « Marie Curie on LinkedIn: Nous recrutons… » → auteur et début du post. */
+function hostOf(url: string): { host: string; path: string } | null {
+  try {
+    const u = new URL(url);
+    return { host: u.hostname.replace(/^www\./, "").toLowerCase(), path: u.pathname };
+  } catch {
+    return null;
+  }
+}
+
+/** Le résultat est-il sur l'un des sites de la liste (x.com couvre twitter.com) ? */
+function onSite(url: string, sites: string[]): boolean {
+  const u = hostOf(url);
+  if (!u) return false;
+  const host = u.host === "twitter.com" ? "x.com" : u.host;
+  return sites.some((s) => {
+    const [h, ...rest] = s.split("/");
+    return (host === h || host.endsWith(`.${h}`)) && (!rest.length || u.path.startsWith(`/${rest.join("/")}`));
+  });
+}
+
+/** Garde un résultat : sur un site de la liste, ou (web libre coché) sur une page d'entreprise hors sites d'emploi. */
+export function wanted(url: string, sites: string[], web: boolean): boolean {
+  const u = hostOf(url);
+  return !!u && (onSite(url, sites) || (web && !BOARD_HOSTS.test(u.host)));
+}
+
+/** Auteur et début du post : « Marie Curie on LinkedIn: Nous recrutons… », « … on X: "…" / X ». */
+const SOCIAL_TITLE = /^(.*?)\s+(?:on|sur)\s+(?:LinkedIn|X|Twitter)\s*:\s*(.*)$/i;
+const unquote = (s: string) => s.replace(/\s*\/\s*X\s*$/i, "").replace(/^["“«\s]+|["”»\s]+$/g, "");
+
 export function parseItem(it: Item): ScrapedOffre | null {
-  const url = (it.link ?? "").split("?")[0];
-  if (!url.includes("linkedin.com/posts/")) return null;
+  const url = (it.link ?? "").split("#")[0];
+  const u = hostOf(url);
+  if (!u) return null;
   const full = clean((it.title ?? "").replace(/\s*\|\s*LinkedIn\s*$/i, ""));
-  const m = /^(.*?)\s+(?:on|sur)\s+LinkedIn\s*:\s*(.*)$/i.exec(full);
-  const title = (m?.[2] || full || "Post LinkedIn").slice(0, 120);
-  const company = m?.[1] || "Post LinkedIn";
+  const social = /(^|\.)linkedin\.com$/.test(u.host) ? "LinkedIn" : /^(x|twitter)\.com$/.test(u.host) ? "X" : null;
+  let kind: string;
+  let title: string;
+  let company: string;
+  let id = url;
+  if (social) {
+    // Un profil ou une page n'est pas une annonce : seuls les posts comptent.
+    if (social === "LinkedIn" ? !u.path.startsWith("/posts/") : !/\/status\/\d+/.test(u.path)) return null;
+    kind = social.toLowerCase();
+    id = url.split("?")[0];
+    const m = SOCIAL_TITLE.exec(full);
+    title = unquote(m?.[2] || full) || `Post ${social}`;
+    company = m?.[1] || `Post ${social}`;
+  } else if (/(^|\.)reddit\.com$/.test(u.host)) {
+    if (!/^\/r\/(?!recruitinghell\b)\w+\/comments\//i.test(u.path)) return null;
+    kind = "reddit";
+    id = url.split("?")[0];
+    title = full.replace(/\s*[:\-–|]\s*r\/\w+\s*$/i, "") || "Post Reddit";
+    company = `r/${/\/r\/(\w+)\//i.exec(u.path)?.[1] ?? "reddit"}`;
+  } else {
+    kind = "web";
+    title = full || u.host;
+    company = u.host;
+  }
+  title = title.slice(0, 120);
   const text = clean(it.snippet ?? "") || title;
   return {
-    source_id: url,
+    source_id: id,
     url,
     title,
     company,
@@ -61,13 +158,13 @@ export function parseItem(it: Item): ScrapedOffre | null {
     description_status: text.length >= 40 ? "ok" : "failed",
     posted_at: null,
     is_vie: detectVie({ source: SOURCE, title, description: text, url }),
-    raw_payload: { via: "serpapi" },
+    raw_payload: { via: "serpapi", kind },
     scrape_errors: text.length >= 40 ? undefined : "extrait trop court",
   };
 }
 
-async function fetchPage(key: string, q: string, start: number): Promise<Item[]> {
-  const params = new URLSearchParams({ engine: "google", api_key: key, q: `site:linkedin.com/posts ${HIRING} "${q}"`, num: String(PAGE_SIZE), start: String(start) });
+async function fetchPage(key: string, query: string, start: number): Promise<Item[]> {
+  const params = new URLSearchParams({ engine: "google", api_key: key, q: query, num: String(PAGE_SIZE), start: String(start) });
   const res = await fetch(`${apiUrl()}?${params}`, { signal: AbortSignal.timeout(30_000) });
   const body = (await res.json().catch(() => null)) as SerpResponse | null;
   // « Google hasn't returned any results » : simplement rien à cette recherche, pas une panne.
@@ -83,26 +180,30 @@ export const googleScraper: Scraper = {
     const key = getGoogleKey();
     if (!key) throw new Error(GOOGLE_MISSING_MESSAGE);
 
+    const sites = getSites();
+    const web = getWeb();
     const max = capOf(criteria, 30);
     const offres = new Map<string, ScrapedOffre>();
     let failure: Error | null = null;
     // Sans intitulé ciblé, la recherche serait trop large pour avoir un sens : rien n'est interrogé.
     search: for (const q of searchQueries(criteria).filter(Boolean)) {
-      for (let page = 0; page < pagesOf(criteria) && offres.size < max; page++) {
-        try {
-          const items = await fetchPage(key, q, page * PAGE_SIZE);
-          for (const it of items) {
-            const o = parseItem(it);
-            if (o && !offres.has(o.source_id)) offres.set(o.source_id, o);
+      for (const query of buildQueries(q, sites, web)) {
+        for (let page = 0; page < pagesOf(criteria) && offres.size < max; page++) {
+          try {
+            const items = await fetchPage(key, query, page * PAGE_SIZE);
+            for (const it of items) {
+              const o = parseItem(it);
+              if (o && wanted(o.url, sites, web) && !offres.has(o.source_id)) offres.set(o.source_id, o);
+            }
+            if (items.length < PAGE_SIZE) break;
+            await sleep(400);
+          } catch (e) {
+            failure = e instanceof Error ? e : new Error(String(e));
+            break search; // quota du compte atteint ou clé refusée : inutile d'insister
           }
-          if (items.length < PAGE_SIZE) break;
-          await sleep(400);
-        } catch (e) {
-          failure = e instanceof Error ? e : new Error(String(e));
-          break search; // quota du compte atteint ou clé refusée : inutile d'insister
         }
+        if (offres.size >= max) break search;
       }
-      if (offres.size >= max) break;
     }
     // Rien de récupéré et une erreur : on la remonte (journal du scan), sinon on garde ce qui est arrivé.
     if (failure && !offres.size) throw failure;

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getDb, getSetting } from "@/lib/db";
-import { GOOGLE_MISSING_MESSAGE, getGoogleKey, googleScraper, parseItem, saveGoogleKey } from "@/lib/scrapers/google";
+import { GOOGLE_MISSING_MESSAGE, buildQueries, getGoogleKey, getSites, getWeb, googleScraper, normalizeSite, parseItem, saveGoogleKey, saveTargets, wanted } from "@/lib/scrapers/google";
 import { findApplyEmail } from "@/lib/mail/contact";
 import type { ScrapedOffre } from "@/lib/scrapers/base";
 
@@ -32,10 +32,77 @@ describe("parseItem", () => {
   });
   it("ignore ce qui n'est pas un post LinkedIn", () => {
     expect(parseItem(item({ link: "https://www.linkedin.com/in/marie-curie" }))).toBeNull();
-    expect(parseItem(item({ link: "https://example.org/x" }))).toBeNull();
   });
   it("marque « failed » un extrait trop court", () => {
     expect(parseItem(item({ snippet: "Court." }))).toMatchObject({ description_status: "failed" });
+  });
+});
+
+describe("parseItem : X, Reddit, pages d'entreprises", () => {
+  it("X : auteur et texte du tweet, sans guillemets ni suffixe", () => {
+    expect(parseItem({ title: 'Marie Curie on X: "Nous recrutons un dev" / X', link: "https://x.com/mcurie/status/123456", snippet: SNIPPET })).toMatchObject({
+      company: "Marie Curie",
+      title: "Nous recrutons un dev",
+      raw_payload: { kind: "x" },
+    });
+    expect(parseItem({ title: "t", link: "https://x.com/mcurie", snippet: SNIPPET })).toBeNull(); // profil, pas un post
+  });
+  it("Reddit : sous-forum en entreprise, r/recruitinghell écarté", () => {
+    expect(parseItem({ title: "[Hiring] Dev React : r/forhire", link: "https://www.reddit.com/r/forhire/comments/abc/hiring/", snippet: SNIPPET })).toMatchObject({
+      company: "r/forhire",
+      title: "[Hiring] Dev React",
+      raw_payload: { kind: "reddit" },
+    });
+    expect(parseItem({ title: "t", link: "https://www.reddit.com/r/recruitinghell/comments/abc/x/", snippet: SNIPPET })).toBeNull();
+  });
+  it("autre site : domaine en entreprise", () => {
+    expect(parseItem({ title: "Rejoignez Acme - Offres", link: "https://www.acme-tech.fr/carrieres/dev", snippet: SNIPPET })).toMatchObject({
+      company: "acme-tech.fr",
+      raw_payload: { kind: "web" },
+    });
+  });
+});
+
+describe("normalizeSite", () => {
+  it("garde un domaine (avec chemin), refuse le reste", () => {
+    expect(normalizeSite(" https://www.Reddit.com/ ")).toBe("reddit.com");
+    expect(normalizeSite("linkedin.com/posts")).toBe("linkedin.com/posts");
+    for (const bad of ["", "reddit", 'x.com" OR site:evil.com', "a b.com", "x.com?q=1"]) expect(normalizeSite(bad)).toBeNull();
+  });
+});
+
+describe("wanted", () => {
+  const sites = ["linkedin.com/posts", "x.com"];
+  it("liste de sites : domaine, sous-domaine, chemin, x.com couvre twitter.com", () => {
+    expect(wanted(POST, sites, false)).toBe(true);
+    expect(wanted("https://twitter.com/a/status/1", sites, false)).toBe(true);
+    expect(wanted("https://www.linkedin.com/in/marie", sites, false)).toBe(false); // hors chemin /posts
+    expect(wanted("https://www.reddit.com/r/forhire/comments/a/b", sites, false)).toBe(false);
+    expect(wanted("https://acme-tech.fr/jobs", sites, false)).toBe(false);
+  });
+  it("web libre : pages d'entreprises oui, sites d'emploi et réseaux non", () => {
+    expect(wanted("https://acme-tech.fr/jobs", [], true)).toBe(true);
+    for (const u of ["https://fr.indeed.com/viewjob?jk=1", "https://www.hellowork.com/fr-fr/emplois/1.html", "https://www.facebook.com/x/posts/1", "https://www.reddit.com/r/a/comments/b/c"])
+      expect(wanted(u, [], true)).toBe(false);
+  });
+});
+
+describe("buildQueries", () => {
+  it("regroupe les sites de la liste dans une requête, le web libre dans une autre", () => {
+    const q = buildQueries("dev", ["linkedin.com/posts", "x.com", "reddit.com"], true);
+    expect(q).toHaveLength(2);
+    expect(q[0]).toContain("(site:linkedin.com/posts OR site:x.com OR site:twitter.com OR site:reddit.com)");
+    expect(q[0]).toContain("-inurl:recruitinghell");
+    expect(q[1]).not.toContain("site:linkedin.com/posts");
+    expect(q[1]).toContain("-site:linkedin.com");
+    expect(q[1]).toContain("-site:indeed.com");
+  });
+  it("LinkedIn seul : une seule requête, sans filtre Reddit ; web seul : une seule aussi", () => {
+    const q = buildQueries("dev", ["linkedin.com/posts"], false);
+    expect(q).toHaveLength(1);
+    expect(q[0]).not.toContain("recruitinghell");
+    expect(buildQueries("dev", [], true)).toHaveLength(1);
+    expect(buildQueries("dev", [], false)).toHaveLength(0);
   });
 });
 
@@ -75,6 +142,25 @@ describe("source Google (SerpAPI)", () => {
     fetchMock.mockResolvedValue(reply({ organic_results: [item()] }));
     await collect({ sectors: [], queries: ["dev"], countries: [], pages: 1 });
     expect(String(fetchMock.mock.calls[0][0])).toMatch(/^https:\/\/serp\.exemple\.test\/search\.json\?/);
+  });
+
+  it("la liste de sites et le web libre décident des requêtes et de ce qui est gardé", async () => {
+    expect(getSites()).toEqual(["linkedin.com/posts"]); // défaut
+    expect(getWeb()).toBe(false);
+    saveTargets(["x.com"], true);
+    fetchMock.mockResolvedValue(
+      reply({
+        organic_results: [
+          item(), // post LinkedIn : plus dans la liste, ignoré
+          { title: 'Marie Curie on X: "Nous recrutons"', link: "https://x.com/mcurie/status/1", snippet: SNIPPET },
+          { title: "Rejoignez Acme", link: "https://acme-tech.fr/jobs", snippet: SNIPPET },
+        ],
+      })
+    );
+    const offres = await collect({ sectors: [], queries: ["dev"], countries: [], pages: 1 });
+    expect(fetchMock).toHaveBeenCalledTimes(2); // liste de sites + web libre
+    expect(offres.map((o) => o.raw_payload.kind).sort()).toEqual(["web", "x"]);
+    saveTargets(["linkedin.com/posts"], false);
   });
 
   it("n'interroge rien sans intitulé ciblé", async () => {

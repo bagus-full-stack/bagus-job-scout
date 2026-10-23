@@ -74,7 +74,7 @@ L'app démarre sur http://127.0.0.1:3000 (écoute limitée à la machine locale,
 | HelloWork | HTML SSR + JSON-LD | France | à activer vous-même |
 | Talent.com | HTML SSR multi-domaines + JSON-LD | France, Belgique, Suisse, Luxembourg, Canada, USA, Maroc, Tunisie, Sénégal | à activer vous-même |
 | LinkedIn | Playwright (pages publiques « guest ») | International (tous pays cibles) | à activer vous-même, moteur à installer |
-| Posts LinkedIn (via Google) | SerpAPI (résultats Google) : extraits des posts publics qui annoncent un recrutement, sans jamais contacter LinkedIn. Clé SerpAPI à saisir dans Profil › Posts LinkedIn (via Google), adresse du service réglable par `SERPAPI_URL` ; une page de 10 résultats = une recherche de votre forfait | International | à activer vous-même, clé à renseigner |
+| Recrutement sur le web (via Google) | SerpAPI (résultats Google) : extraits des annonces publiques de recrutement (posts LinkedIn, X, Reddit, pages de recrutement d'entreprises, au choix), sans contacter ces sites. Clé SerpAPI et choix des lieux dans Profil › Recrutement sur le web (via Google), adresse du service réglable par `SERPAPI_URL` ; une page de 10 résultats = une recherche de votre forfait | International | à activer vous-même, clé à renseigner |
 | APEC | — | France (cadres) | **suspendue** : le site bloque désormais les requêtes automatiques |
 | Civiweb (V.I.E) | — | International | **suspendue** : Business France exige désormais une authentification que JobScout ne gère pas |
 
