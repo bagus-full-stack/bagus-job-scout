@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Mail } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, Mail } from "lucide-react";
 import { PageHeader } from "@/components/app/page-header";
 import { Badge } from "@/components/ui/badge";
 import { listSpontaneous } from "@/lib/db/spontanees";
@@ -20,24 +20,40 @@ const STATUS_LABELS: Record<string, string> = {
   refusee: "Refusée",
 };
 
-export default function SpontaneesPage() {
-  const contacts = listSpontaneous();
+const PAGE_SIZE = 25;
+
+/** Numéros affichés : première, dernière, et la page courante avec ses voisines (« 1 … 4 5 6 … 10 »). */
+function pageNumbers(page: number, pages: number): (number | null)[] {
+  const keep = new Set([1, pages, page - 1, page, page + 1].filter((n) => n >= 1 && n <= pages));
+  const out: (number | null)[] = [];
+  [...keep].sort((a, b) => a - b).forEach((n, i, all) => {
+    if (i > 0 && n - all[i - 1] > 1) out.push(null);
+    out.push(n);
+  });
+  return out;
+}
+
+export default async function SpontaneesPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  const all = listSpontaneous();
+  const pages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
+  const page = Math.min(pages, Math.max(1, Math.floor(Number((await searchParams).page)) || 1));
+  const contacts = all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const roles = getProfile()?.target_titles ?? [];
-  const sent = contacts.filter((c) => c.status && c.status !== "en_cours").length;
-  const subtitle = contacts.length
-    ? `${contacts.length} contact${contacts.length > 1 ? "s" : ""} · ${sent} candidature${sent > 1 ? "s" : ""} envoyée${sent > 1 ? "s" : ""}`
+  const sent = all.filter((c) => c.status && c.status !== "en_cours").length;
+  const subtitle = all.length
+    ? `${all.length} contact${all.length > 1 ? "s" : ""} · ${sent} candidature${sent > 1 ? "s" : ""} envoyée${sent > 1 ? "s" : ""}`
     : "Importez un fichier de contacts pour postuler sans offre publiée.";
   return (
     <>
       <PageHeader eyebrow="Prendre les devants" title="Candidatures spontanées" subtitle={subtitle} actions={
           <div className="flex flex-wrap items-start gap-2">
-            {contacts.length > 0 && <AiRoleButton />}
-            {contacts.length > 0 && <VerifyButton />}
+            {all.length > 0 && <AiRoleButton />}
+            {all.length > 0 && <VerifyButton />}
             <ImportContacts />
           </div>
         } />
 
-      {contacts.length === 0 ? (
+      {all.length === 0 ? (
         <div className="glass-panel px-6 py-16 text-center">
           <Mail className="mx-auto mb-4 h-9 w-9 text-accent" />
           <h2 className="font-display text-h2">Aucun contact importé</h2>
@@ -74,6 +90,37 @@ export default function SpontaneesPage() {
             </li>
           ))}
         </ul>
+        {pages > 1 && (
+          <nav aria-label="Pagination" className="mt-5 flex flex-wrap items-center justify-center gap-1.5">
+            {page > 1 ? (
+              <Link href={`/spontanees?page=${page - 1}`} aria-label="Page précédente" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border hover:border-accent hover:text-accent">
+                <ChevronLeft className="h-4 w-4" />
+              </Link>
+            ) : null}
+            {pageNumbers(page, pages).map((n, i) =>
+              n === null ? (
+                <span key={`gap${i}`} className="px-1 text-textSecondary">…</span>
+              ) : (
+                <Link
+                  key={n}
+                  href={`/spontanees?page=${n}`}
+                  aria-current={n === page ? "page" : undefined}
+                  className={`inline-flex h-9 min-w-9 items-center justify-center rounded-md border px-2 text-small font-semibold ${n === page ? "border-accent bg-accent text-onAccent" : "border-border hover:border-accent hover:text-accent"}`}
+                >
+                  {n}
+                </Link>
+              )
+            )}
+            {page < pages ? (
+              <Link href={`/spontanees?page=${page + 1}`} aria-label="Page suivante" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border hover:border-accent hover:text-accent">
+                <ChevronRight className="h-4 w-4" />
+              </Link>
+            ) : null}
+          </nav>
+        )}
+        <p className="mt-2 text-center text-caption text-textSecondary">
+          {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, all.length)} sur {all.length}
+        </p>
         </>
       )}
     </>
