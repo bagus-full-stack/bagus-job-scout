@@ -8,6 +8,10 @@ import { getDb } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { DescriptionRenderer } from "@/components/app/description-renderer";
 import { ActionsPanel } from "./actions";
+import { getProfile } from "@/lib/db/queries";
+import { detectDocLanguage, sourceLanguageHint } from "@/lib/text/lang";
+import { findApplyEmail } from "@/lib/mail/contact";
+import { mailDraft } from "@/lib/mail/draft";
 import { formatRelativeDate, scoreColor } from "@/lib/utils";
 import { CONTRACT_LABELS } from "@/lib/contracts";
 import { SOURCES_META } from "@/lib/sources-meta";
@@ -26,6 +30,17 @@ export default async function OffreDetailPage({ params }: { params: Promise<{ id
   const lmDocx = docs.find((d) => d.type === "lm" && d.format === "docx") ?? null;
   const msgDoc = docs.find((d) => d.type === "msg") ?? null;
   const existingApplication = getDb().prepare("SELECT status FROM candidatures WHERE offre_id = ? LIMIT 1").get(offre.id) as { status: string } | undefined;
+  const profile = getProfile();
+  const draft = mailDraft({
+    lang: detectDocLanguage(offre.title, offre.description_text, sourceLanguageHint(offre.source, offre.raw_payload), offre.country),
+    title: offre.title,
+    company: offre.company,
+    fullName: profile?.full_name ?? "",
+    phone: profile?.phone,
+    email: profile?.email,
+    spontaneous: offre.source === "spontanee",
+  });
+  const mail = { to: findApplyEmail(offre.description_text) ?? "", ...draft };
   const score = scoreColor(offre.score ?? 0);
   const distance = offerDistanceText(offre);
   const sourceLabel = SOURCES_META.find((source) => source.id === offre.source)?.label ?? offre.source;
@@ -84,6 +99,7 @@ export default async function OffreDetailPage({ params }: { params: Promise<{ id
             isVie={offre.contract_category === "vie"}
             initial={{ cv_pdf_id: cvPdf?.id ?? null, cv_docx_id: cvDocx?.id ?? null, lm_pdf_id: lmPdf?.id ?? null, lm_docx_id: lmDocx?.id ?? null, msg_id: msgDoc?.id ?? null }}
             initialTrackingStatus={existingApplication?.status ?? null}
+            mail={mail}
             initialFolder={docs.length > 0 ? offreFolderPath(offre.id, offre.company, offre.title) : null}
           />
           {offre.score_breakdown && (

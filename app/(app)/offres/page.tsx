@@ -3,6 +3,7 @@ import { getDistanceHome, suggestedDistanceHome } from "@/lib/distance/home";
 import { PageHeader } from "@/components/app/page-header";
 import { OffresList } from "./list";
 import { ScanButton } from "./scan-button";
+import { ImportContacts } from "./import-contacts";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,12 @@ export default async function OffresPage({ searchParams }: { searchParams: Promi
         eyebrow="Découvrir"
         title="Vos prochaines opportunités"
         subtitle={subtitle}
-        actions={<ScanButton />}
+        actions={
+          <div className="flex flex-wrap items-start gap-2">
+            <ImportContacts />
+            <ScanButton />
+          </div>
+        }
       />
       <OffresList initialResult={initial} initialVieOnly={vieOnly} initialMinScore={minScore} homeSuggestion={homeSuggestion} />
     </>

@@ -74,5 +74,7 @@ export function sourceRequiresEngine(id: string): boolean {
 }
 
 export function sourceLabel(id: string): string {
+  // Source locale (fichier de contacts importé) : aucun scraper, donc absente de SOURCES_META.
+  if (id === "spontanee") return "Candidature spontanée";
   return SOURCES_META.find((s) => s.id === id)?.label ?? id;
 }

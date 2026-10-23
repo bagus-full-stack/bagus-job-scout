@@ -5,6 +5,7 @@ import { Check, FileText, Mail, MessageSquare, Download, Sparkles, FolderOpen, A
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { Input, Textarea } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 type DocsState = {
@@ -46,6 +47,7 @@ export function ActionsPanel({
   initial,
   initialTrackingStatus = null,
   initialFolder = null,
+  mail,
 }: {
   offreId: number;
   offreUrl: string;
@@ -59,6 +61,7 @@ export function ActionsPanel({
   };
   initialTrackingStatus?: string | null;
   initialFolder?: string | null;
+  mail: { to: string; subject: string; body: string };
 }) {
   const [docs, setDocs] = useState<DocsState>(initial);
   const [allLoading, setAllLoading] = useState(false);
@@ -376,6 +379,8 @@ export function ActionsPanel({
         </p>
       </div>
 
+      {docsReady && !applied && <EmailApply offreId={offreId} mail={mail} onSent={() => setTrackingStatus("envoyee")} />}
+
       {error && (
         <p role="alert" className="pt-2 text-small text-danger">
           {error}
@@ -485,6 +490,134 @@ function ActionRow({
           {done ? "Régénérer" : "Générer"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+type MailSettings = { configured: boolean; host: string; port: number; user: string; fromName: string };
+
+// Envoi du CV + de la lettre (PDF) par e-mail. Rien ne part sans le clic sur « Envoyer »,
+// après relecture du destinataire, de l'objet et du message.
+function EmailApply({
+  offreId,
+  mail,
+  onSent,
+}: {
+  offreId: number;
+  mail: { to: string; subject: string; body: string };
+  onSent: () => void;
+}) {
+  const [open, setOpen] = useState(!!mail.to);
+  const [to, setTo] = useState(mail.to);
+  const [subject, setSubject] = useState(mail.subject);
+  const [body, setBody] = useState(mail.body);
+  const [cfg, setCfg] = useState<MailSettings | null>(null);
+  const [editCfg, setEditCfg] = useState(false);
+  const [pass, setPass] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    if (!open || cfg) return;
+    fetch("/api/mail/settings")
+      .then((r) => r.json())
+      .then((c: MailSettings) => {
+        setCfg(c);
+        setEditCfg(!c.configured);
+      })
+      .catch(() => setMsg({ ok: false, text: "Réglages de messagerie illisibles." }));
+  }, [open, cfg]);
+
+  async function saveCfg() {
+    if (!cfg) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/mail/settings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...cfg, pass }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return setMsg({ ok: false, text: data?.error || "Réglages non enregistrés." });
+      setCfg({ ...cfg, configured: true });
+      setPass("");
+      setEditCfg(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function send() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/apply/email", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ offreId, to, subject, body }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return setMsg({ ok: false, text: data?.error || `Erreur serveur (HTTP ${res.status}).` });
+      setMsg({ ok: true, text: `Candidature envoyée à ${to} et enregistrée « Envoyée ».` });
+      onSent();
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Erreur réseau" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open)
+    return (
+      <Button variant="ghost" size="md" className="w-full" onClick={() => setOpen(true)}>
+        <Mail className="h-4 w-4" /> Postuler par e-mail
+      </Button>
+    );
+
+  return (
+    <div className="space-y-2 border-t border-border pt-4">
+      <p className="text-small font-semibold">Postuler par e-mail</p>
+      {!mail.to && <p className="text-caption text-textSecondary">Aucune adresse trouvée dans l'annonce : saisissez-la.</p>}
+      <Input type="email" placeholder="destinataire@entreprise.com" value={to} onChange={(e) => setTo(e.target.value)} />
+      <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
+      <Textarea rows={9} value={body} onChange={(e) => setBody(e.target.value)} />
+      <p className="text-caption text-textSecondary">Pièces jointes : CV et lettre de motivation (PDF).</p>
+
+      {cfg && editCfg && (
+        <div className="space-y-2 rounded-md border border-border p-3">
+          <p className="text-caption text-textSecondary">
+            Messagerie (Gmail : activez la validation en 2 étapes puis créez un « mot de passe d'application »).
+          </p>
+          <div className="flex gap-2">
+            <Input value={cfg.host} onChange={(e) => setCfg({ ...cfg, host: e.target.value })} placeholder="smtp.gmail.com" />
+            <Input className="w-24" type="number" value={cfg.port} onChange={(e) => setCfg({ ...cfg, port: Number(e.target.value) })} />
+          </div>
+          <Input type="email" value={cfg.user} onChange={(e) => setCfg({ ...cfg, user: e.target.value })} placeholder="votre adresse e-mail" />
+          <Input value={cfg.fromName} onChange={(e) => setCfg({ ...cfg, fromName: e.target.value })} placeholder="Nom affiché (optionnel)" />
+          <Input type="password" autoComplete="off" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={cfg.configured ? "Mot de passe inchangé" : "Mot de passe d'application"} />
+          <Button size="md" variant="secondary" className="w-full" onClick={saveCfg} disabled={busy}>
+            Enregistrer la messagerie
+          </Button>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <Button size="lg" className="flex-1" onClick={send} disabled={busy || !cfg?.configured || !to.trim()}>
+          {busy ? <Spinner size={16} className="text-current" /> : <Send className="h-4 w-4" />}
+          Envoyer
+        </Button>
+        {cfg?.configured && !editCfg && (
+          <Button size="lg" variant="ghost" onClick={() => setEditCfg(true)} disabled={busy}>
+            Messagerie
+          </Button>
+        )}
+      </div>
+      {msg && (
+        <p role={msg.ok ? "status" : "alert"} className={cn("text-small", msg.ok ? "text-success" : "text-danger")}>
+          {msg.text}
+        </p>
+      )}
     </div>
   );
 }
