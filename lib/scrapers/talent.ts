@@ -13,6 +13,7 @@ import {
   BROWSER_HEADERS,
   sleep,
 } from "./dom";
+import { capOf, pagesOf } from "./pages";
 
 const SOURCE = "talent";
 
@@ -203,7 +204,7 @@ export const talentScraper: Scraper = {
     }
 
     // Budget réparti : ~20 offres par pays, borné par maxOffres global.
-    const max = criteria.maxOffres ?? Math.min(150, activeDomains.length * 20);
+    const max = capOf(criteria, Math.min(150, activeDomains.length * 20));
     const perDomain = Math.max(10, Math.floor(max / activeDomains.length));
     const queries = searchQueries(criteria);
     const seen = new Map<string, Card>();
@@ -211,7 +212,7 @@ export const talentScraper: Scraper = {
     for (const domain of activeDomains) {
       let domainCount = 0;
       for (const q of queries) {
-        for (let page = 1; page <= 2 && domainCount < perDomain; page++) {
+        for (let page = 1; page <= pagesOf(criteria) && domainCount < perDomain; page++) {
           try {
             const cards = await fetchSearchPage(domain, q, page);
             if (!cards.length) break;

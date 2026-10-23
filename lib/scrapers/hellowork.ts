@@ -11,6 +11,7 @@ import {
   BROWSER_HEADERS,
   sleep,
 } from "./dom";
+import { capOf, pagesOf } from "./pages";
 
 const SOURCE = "hellowork";
 const SEARCH_URL = "https://www.hellowork.com/fr-fr/emploi/recherche.html";
@@ -159,12 +160,12 @@ export const helloworkScraper: Scraper = {
       return;
     }
 
-    const max = criteria.maxOffres ?? 50;
+    const max = capOf(criteria, 50);
     const queries = searchQueries(criteria);
     const seen = new Map<string, Card>();
 
     for (const q of queries) {
-      for (let page = 1; page <= 3 && seen.size < max; page++) {
+      for (let page = 1; page <= pagesOf(criteria) && seen.size < max; page++) {
         try {
           const cards = await fetchSearchPage(q, page);
           if (!cards.length) break;

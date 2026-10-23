@@ -5,6 +5,7 @@ import { htmlToText } from "./base";
 import { detectVie } from "@/lib/vie";
 import { normalizeCountryName, nameToCode } from "@/lib/countries";
 import { decodeHtmlEntities } from "@/lib/text/entities";
+import { capOf, pagesOf } from "./pages";
 
 /**
  * Welcome to the Jungle via son index de recherche public (Algolia) — le même
@@ -22,7 +23,6 @@ const ALGOLIA_API_KEY = process.env.WTTJ_ALGOLIA_KEY || "4bd8f6215d0cc52b2643076
 const INDEX = "wttj_jobs_production_fr";
 const SITE = "https://www.welcometothejungle.com";
 const HITS_PER_PAGE = 50;
-const PAGES_PER_QUERY = 2;
 
 export type Hit = {
   objectID: string;
@@ -166,17 +166,17 @@ export const wttjScraper: Scraper = {
   name: SOURCE,
   async *scrape(criteria: ScrapeCriteria, onEvent: (e: ProgressEvent) => void) {
     onEvent({ kind: "start", source: SOURCE });
-    const max = criteria.maxOffres ?? 200;
+    const max = capOf(criteria, 200);
     const targetCodes = new Set(
       criteria.countries.map((c) => nameToCode(c)).filter((c): c is string => !!c)
     );
     const queries = searchQueries(criteria);
 
-    // 1. Collecte via l'index : une recherche par secteur cible, 2 pages max.
+    // 1. Collecte via l'index : une recherche par intitulé cible, `pages` pages max.
     const seen = new Map<string, Hit>();
     let apiError: string | null = null;
     for (const q of queries) {
-      for (let page = 0; page < PAGES_PER_QUERY; page++) {
+      for (let page = 0; page < pagesOf(criteria); page++) {
         try {
           const { hits, nbPages } = await searchPage(q, page);
           for (const h of hits) if (h?.objectID && !seen.has(h.objectID)) seen.set(h.objectID, h);

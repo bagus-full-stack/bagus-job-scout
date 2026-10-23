@@ -33,6 +33,8 @@ export type ScrapeCriteria = {
   contracts?: string[];
   countries: string[];
   maxOffres?: number;
+  /** Pages de résultats parcourues par recherche et par source (lib/scrapers/pages.ts). */
+  pages?: number;
 };
 
 export type ProgressEvent =

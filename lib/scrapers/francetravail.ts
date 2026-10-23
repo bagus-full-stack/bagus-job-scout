@@ -12,6 +12,7 @@ import {
   BROWSER_HEADERS,
   sleep,
 } from "./dom";
+import { capOf, pagesOf } from "./pages";
 
 const SOURCE = "francetravail";
 
@@ -246,14 +247,14 @@ export const francetravailScraper: Scraper = {
       return;
     }
 
-    const max = criteria.maxOffres ?? 50;
+    const max = capOf(criteria, 50);
     const queries = searchQueries(criteria);
 
     // Stratégie 1 : API officielle (descriptions complètes, aucun fetch détail nécessaire)
     const apiOffres = new Map<string, ScrapedOffre>();
     for (const q of queries) {
       let start = 0;
-      while (apiOffres.size < max && start < 150) {
+      while (apiOffres.size < max && start < 50 * pagesOf(criteria)) {
         const jobs = await fetchApi(q, start, 50, criteria.contracts);
         if (!jobs.length) break;
         for (const j of jobs) {
@@ -283,7 +284,7 @@ export const francetravailScraper: Scraper = {
     // Stratégie 2 : HTML fallback
     const seen = new Map<string, HtmlCard>();
     for (const q of queries) {
-      for (let page = 1; page <= 3 && seen.size < max; page++) {
+      for (let page = 1; page <= pagesOf(criteria) && seen.size < max; page++) {
         try {
           const cards = await fetchHtmlPage(q, page);
           if (!cards.length) break;

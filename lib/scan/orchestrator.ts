@@ -6,6 +6,7 @@ import { sanitizeScrapedOffre } from "@/lib/offres/clean-text";
 import { registerScanForRepairs } from "@/lib/db/repair-markup";
 import { scoreOffresLocal } from "@/lib/scoring/local";
 import { getProfile } from "@/lib/db/queries";
+import { getScanPages } from "./pages";
 import { aiRerankTop } from "@/lib/scoring/ai-pass";
 import { getDb } from "@/lib/db";
 import type { ProgressEvent } from "@/lib/scrapers/base";
@@ -76,6 +77,7 @@ export async function* runScan(
         queries: profile.target_titles,
         contracts: profile.preferred_contracts,
         countries: profile.target_countries,
+        pages: getScanPages(),
       };
       const progressQueue: ProgressEvent[] = [];
       const onEvent = (e: ProgressEvent) => progressQueue.push(e);

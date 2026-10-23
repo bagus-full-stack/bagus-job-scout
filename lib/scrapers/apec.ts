@@ -3,6 +3,7 @@ import type { Scraper, ScrapedOffre, ScrapeCriteria, ProgressEvent } from "./bas
 import { searchQueries } from "./base";
 import { detectVie } from "@/lib/vie";
 import { parseDocument, firstMatchHtml, largestTextBlockHtml, sleep } from "./dom";
+import { capOf, pagesOf } from "./pages";
 
 const SOURCE = "apec";
 const SEARCH_URL = "https://www.apec.fr/cms/webservices/rechercheOffre";
@@ -162,14 +163,14 @@ export const apecScraper: Scraper = {
       return;
     }
 
-    const max = criteria.maxOffres ?? 60;
+    const max = capOf(criteria, 60);
     const queries = searchQueries(criteria);
     const seen = new Map<string, ApecJob>();
 
     for (const q of queries) {
       let start = 0;
       const size = 20;
-      while (seen.size < max && start < 100) {
+      while (seen.size < max && start < size * pagesOf(criteria)) {
         try {
           const { jobs } = await searchPage(q, start, size);
           if (!jobs.length) break;

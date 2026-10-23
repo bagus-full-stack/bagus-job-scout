@@ -4,6 +4,7 @@ import { htmlToText, newContext, searchQueries } from "./base";
 import { detectVie } from "@/lib/vie";
 import { normalizeCountryName, strictCountryName } from "@/lib/countries";
 import { decodeHtmlEntities, unescapeEscapedHtml } from "@/lib/text/entities";
+import { capOf, pagesOf } from "./pages";
 
 const SOURCE = "linkedin";
 
@@ -55,21 +56,21 @@ export const linkedinScraper: Scraper = {
     onEvent({ kind: "start", source: SOURCE });
     const ctx = await newContext();
     const page = await ctx.newPage();
-    const max = criteria.maxOffres ?? 300;
+    const max = capOf(criteria, 300);
 
     try {
       const seen = new Set<string>();
       const cards: ListingCard[] = [];
 
       const countries = criteria.countries.length ? criteria.countries : [""];
-      // 2 pages max par combinaison secteur×pays : avec une liste de pays large
+      // `pages` pages max par combinaison secteur×pays : avec une liste de pays large
       // (ex. francophonie), on couvre chaque pays au lieu d'épuiser le budget
       // sur la première combinaison.
       for (const sector of searchQueries(criteria)) {
         for (const country of countries) {
           if (cards.length >= max) break;
           let start = 0;
-          for (let p = 0; p < 2 && cards.length < max; p++) {
+          for (let p = 0; p < pagesOf(criteria) && cards.length < max; p++) {
             const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(
               sector
             )}&location=${encodeURIComponent(country)}&start=${start}`;
