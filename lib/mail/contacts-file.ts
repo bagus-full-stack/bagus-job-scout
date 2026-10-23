@@ -8,6 +8,11 @@ export type Contact = { email: string; company: string };
 // Messageries grand public : le domaine ne dit rien de l'entreprise.
 const FREE_MAIL = /^(gmail|googlemail|outlook|hotmail|live|msn|yahoo|ymail|icloud|me|proton|protonmail|orange|wanadoo|free|sfr|laposte|neuf|bbox)\./i;
 
+/** Texte de l'« offre » d'un contact spontané : c'est lui que lisent le CV, la lettre et le mail. */
+export function spontaneousDescription(company: string, email: string, role: string): string {
+  return `Candidature spontanée adressée à ${company} (${email}). Poste visé : ${role}. Aucune offre publiée : présenter le profil du candidat pour ce type de poste.`;
+}
+
 const COMPANY_HEADER = /^(entreprise|soci[ée]t[ée]|company|organi[sz]ation|organisme|nom)$/i;
 
 const titleCase =(s: string) => s.charAt(0).toUpperCase() + s.slice(1);

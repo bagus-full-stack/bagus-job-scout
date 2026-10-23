@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { upsertOffreFromSource } from "@/lib/db/offres";
 import { getProfile } from "@/lib/db/queries";
-import { parseContacts, SPONTANEOUS_SOURCE } from "@/lib/mail/contacts-file";
+import { getDb } from "@/lib/db";
+import { parseContacts, spontaneousDescription, SPONTANEOUS_SOURCE } from "@/lib/mail/contacts-file";
 import { sheetsToText } from "@/lib/excel/contacts";
 import { verifySpontaneous } from "@/lib/db/spontanees";
 
@@ -28,13 +29,23 @@ export async function POST(req: NextRequest) {
   const profile = getProfile();
   const role = (profile?.target_titles ?? [])[0] || "Candidature spontanée";
   const country = (profile?.target_countries ?? [])[0] ?? null;
+  // Réimport : le poste choisi (et son origine, le contrôle DNS) pour un contact est conservé.
+  const known = new Map(
+    (getDb().prepare("SELECT source_id, title, raw_payload FROM offres WHERE source = ?").all(SPONTANEOUS_SOURCE) as { source_id: string; title: string; raw_payload: string | null }[]).map((r) => [r.source_id, r])
+  );
   const ids: number[] = [];
   for (const c of contacts) {
-    const description = `Candidature spontanée adressée à ${c.company} (${c.email}). Poste visé : ${role}. Aucune offre publiée : présenter le profil du candidat pour ce type de poste.`;
+    const prev = known.get(c.email);
+    const contactRole = prev?.title ?? role;
+    let kept: Record<string, unknown> = {};
+    try {
+      kept = prev?.raw_payload ? JSON.parse(prev.raw_payload) : {};
+    } catch {}
+    const description = spontaneousDescription(c.company, c.email, contactRole);
     ids.push(upsertOffreFromSource(SPONTANEOUS_SOURCE, {
       source_id: c.email,
       url: `mailto:${c.email}`,
-      title: role,
+      title: contactRole,
       company: c.company,
       country,
       location: null,
@@ -45,7 +56,7 @@ export async function POST(req: NextRequest) {
       description_status: "ok",
       posted_at: null,
       is_vie: false,
-      raw_payload: { spontaneous: true, email: c.email },
+      raw_payload: { ...kept, spontaneous: true, email: c.email },
     }));
   }
   // Contrôle DNS des contacts importés : une panne DNS ne doit jamais faire échouer l'import.

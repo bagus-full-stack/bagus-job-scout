@@ -1,7 +1,7 @@
 import "server-only";
 import { getDb } from "./index";
 import { deleteDocuments } from "./documents";
-import { SPONTANEOUS_SOURCE } from "@/lib/mail/contacts-file";
+import { SPONTANEOUS_SOURCE, spontaneousDescription } from "@/lib/mail/contacts-file";
 import { checkDomains, type DomainStatus } from "@/lib/mail/dns-check";
 
 export type SpontaneousContact = {
@@ -15,6 +15,9 @@ export type SpontaneousContact = {
   status: string | null;
   /** Résultat du dernier contrôle DNS ; null = jamais vérifié. */
   dns: DomainStatus | null;
+  /** « manual » : choisi par l'utilisateur (jamais écrasé par l'IA) ; « ai » : choisi par l'IA ; null : poste par défaut. */
+  role_source: "manual" | "ai" | null;
+  role_reason: string | null;
 };
 
 export function listSpontaneous(): SpontaneousContact[] {
@@ -24,7 +27,9 @@ export function listSpontaneous(): SpontaneousContact[] {
         EXISTS(SELECT 1 FROM documents WHERE offre_id = o.id AND type = 'cv') AS has_cv,
         EXISTS(SELECT 1 FROM documents WHERE offre_id = o.id AND type = 'lm') AS has_lm,
         (SELECT status FROM candidatures WHERE offre_id = o.id LIMIT 1) AS status,
-        CASE WHEN json_valid(o.raw_payload) THEN json_extract(o.raw_payload, '$.dns.status') END AS dns
+        CASE WHEN json_valid(o.raw_payload) THEN json_extract(o.raw_payload, '$.dns.status') END AS dns,
+        CASE WHEN json_valid(o.raw_payload) THEN json_extract(o.raw_payload, '$.role_source') END AS role_source,
+        CASE WHEN json_valid(o.raw_payload) THEN json_extract(o.raw_payload, '$.role_reason') END AS role_reason
        FROM offres o WHERE o.source = ? ORDER BY o.scraped_at DESC, o.id DESC`
     )
     .all(SPONTANEOUS_SOURCE)
@@ -47,6 +52,49 @@ export async function verifySpontaneous(ids?: number[]): Promise<Record<DomainSt
     update.run(JSON.stringify({ status: s, checked_at }), r.id);
   }
   return counts;
+}
+
+const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** Change le poste visé d'un contact (ou de tous si `ids` est absent) ; le texte de l'offre suit. Renvoie le nombre de contacts. */
+export function setSpontaneousRole(role: string, ids?: number[]): number {
+  const db = getDb();
+  const rows = (db.prepare("SELECT id, company, source_id AS email FROM offres WHERE source = ?").all(SPONTANEOUS_SOURCE) as { id: number; company: string; email: string }[]).filter(
+    (r) => !ids || ids.includes(r.id)
+  );
+  for (const r of rows) writeRole(r, role, "manual", null);
+  return rows.length;
+}
+
+const SAFE_JSON = "CASE WHEN json_valid(raw_payload) THEN raw_payload ELSE '{}' END";
+
+function writeRole(r: { id: number; company: string; email: string }, role: string, source: "manual" | "ai", reason: string | null) {
+  const text = spontaneousDescription(r.company, r.email, role);
+  getDb()
+    .prepare(
+      `UPDATE offres SET title = ?, description_text = ?, description_html = ?,
+         raw_payload = json_set(${SAFE_JSON}, '$.role_source', ?, '$.role_reason', ?) WHERE id = ?`
+    )
+    .run(role, text, `<p>${escHtml(text)}</p>`, source, reason, r.id);
+}
+
+/** Contacts dont le poste n'a pas été choisi à la main : seuls ceux-là passent par l'IA. */
+export function contactsForAi(): { id: number; company: string; email: string }[] {
+  return getDb()
+    .prepare(
+      `SELECT id, company, source_id AS email FROM offres WHERE source = ?
+       AND COALESCE(CASE WHEN json_valid(raw_payload) THEN json_extract(raw_payload, '$.role_source') END, '') <> 'manual' ORDER BY id`
+    )
+    .all(SPONTANEOUS_SOURCE)
+    .map((r) => ({ ...(r as { id: number; company: string; email: string }) }));
+}
+
+export function applyAiRoles(choices: { id: number; role: string; reason: string }[]) {
+  const byId = new Map(contactsForAi().map((c) => [c.id, c]));
+  for (const c of choices) {
+    const r = byId.get(c.id);
+    if (r) writeRole(r, c.role, "ai", c.reason || null);
+  }
 }
 
 /** Supprime le contact, ses documents (fichiers compris) et sa candidature. Ne touche jamais une vraie offre. */
