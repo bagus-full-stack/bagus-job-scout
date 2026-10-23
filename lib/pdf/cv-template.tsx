@@ -30,8 +30,8 @@ export const CV_FONT_SIZES = Array.from({ length: 14 }, (_, i) => 9 + i * 0.25);
 const makeStyles = (fs: number) =>
   StyleSheet.create({
     page: {
-      paddingHorizontal: 28,
-      paddingVertical: 22,
+      paddingHorizontal: 15,
+      paddingVertical: 15,
       fontFamily: "Times-Roman",
       fontSize: fs,
       lineHeight: 1.18,
