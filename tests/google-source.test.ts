@@ -67,6 +67,7 @@ describe("normalizeSite", () => {
   it("garde un domaine (avec chemin), refuse le reste", () => {
     expect(normalizeSite(" https://www.Reddit.com/ ")).toBe("reddit.com");
     expect(normalizeSite("linkedin.com/posts")).toBe("linkedin.com/posts");
+    expect(normalizeSite("Twitter.com")).toBe("x.com");
     for (const bad of ["", "reddit", 'x.com" OR site:evil.com', "a b.com", "x.com?q=1"]) expect(normalizeSite(bad)).toBeNull();
   });
 });
@@ -176,6 +177,27 @@ describe("source Google (SerpAPI)", () => {
   it("remonte l'erreur de SerpAPI (clé refusée, quota) quand rien n'a été récupéré", async () => {
     fetchMock.mockResolvedValue(reply({ error: "Invalid API key." }, 401));
     await expect(collect({ sectors: [], queries: ["dev"], countries: [], pages: 1 })).rejects.toThrow(/HTTP 401.*Invalid API key/);
+  });
+
+  it("lit la page suivante même si la première compte moins de 10 résultats, mais pas plus de 2 pages", async () => {
+    const page = (n: number, k: number) => reply({ organic_results: Array.from({ length: n }, (_, i) => item({ link: `https://fr.linkedin.com/posts/u-${k}-${i}-activity-1` })) });
+    fetchMock.mockResolvedValueOnce(page(8, 1)).mockResolvedValueOnce(page(8, 2)).mockResolvedValue(page(8, 3));
+    const offres = await collect({ sectors: [], queries: ["dev"], countries: [], pages: 5, maxOffres: 100 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(offres).toHaveLength(16);
+  });
+
+  it("s'arrête à la première page vide", async () => {
+    fetchMock.mockResolvedValue(reply({ organic_results: [] }));
+    await collect({ sectors: [], queries: ["dev"], countries: [], pages: 5 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("twitter.com saisi dans la liste garde les posts X", async () => {
+    saveTargets(["twitter.com"], false);
+    fetchMock.mockResolvedValue(reply({ organic_results: [{ title: 'Marie on X: "Nous recrutons"', link: "https://twitter.com/m/status/9", snippet: SNIPPET }] }));
+    expect(await collect({ sectors: [], queries: ["dev"], countries: [], pages: 1 })).toHaveLength(1);
+    saveTargets(["linkedin.com/posts", "apec.fr"], false);
   });
 
   it("garde les résultats déjà reçus si une page suivante est refusée", async () => {

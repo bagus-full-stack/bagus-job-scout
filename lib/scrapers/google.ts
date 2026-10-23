@@ -18,6 +18,8 @@ const SOURCE = "google";
 const DEFAULT_API = "https://serpapi.com/search.json";
 const PAGE_SIZE = 10;
 const MAX_SITES = 10;
+// shortcut: 2 pages par requête, car chaque page coûte une recherche du forfait SerpAPI et les suivantes rapportent peu ; à relever si le quota le permet.
+const MAX_PAGES = 2;
 const HIRING = '("recrute" OR "nous recrutons" OR "hiring" OR "we are hiring" OR "offre d\'emploi")';
 const APPLY = '("envoyez votre CV" OR "envoyez votre candidature" OR "send your CV" OR "send your resume")';
 
@@ -37,7 +39,7 @@ export function saveGoogleKey(key: string) {
 
 /** « https://www.Reddit.com/ » → « reddit.com » ; null si ce n'est pas un domaine (avec chemin éventuel). Sert aussi à écarter tout ce qui fausserait la requête Google. */
 export function normalizeSite(raw: string): string | null {
-  const s = raw.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "");
+  const s = raw.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "").replace(/^twitter\.com(?=\/|$)/, "x.com"); // un seul nom pour X : la requête et le filtre des résultats le comparent tels quels
   return /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(\/[a-z0-9_\-./]*)?$/.test(s) ? s : null;
 }
 
@@ -188,14 +190,14 @@ export const googleScraper: Scraper = {
     // Sans intitulé ciblé, la recherche serait trop large pour avoir un sens : rien n'est interrogé.
     search: for (const q of searchQueries(criteria).filter(Boolean)) {
       for (const query of buildQueries(q, sites, web)) {
-        for (let page = 0; page < pagesOf(criteria) && offres.size < max; page++) {
+        for (let page = 0; page < Math.min(pagesOf(criteria), MAX_PAGES) && offres.size < max; page++) {
           try {
             const items = await fetchPage(key, query, page * PAGE_SIZE);
             for (const it of items) {
               const o = parseItem(it);
               if (o && wanted(o.url, sites, web) && !offres.has(o.source_id)) offres.set(o.source_id, o);
             }
-            if (items.length < PAGE_SIZE) break;
+            if (!items.length) break; // une page pleine peut compter moins de 10 résultats (encarts Google) : seule une page vide est la dernière
             await sleep(400);
           } catch (e) {
             failure = e instanceof Error ? e : new Error(String(e));
