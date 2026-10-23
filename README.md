@@ -2,7 +2,7 @@
 
 Trouvez des offres d'emploi grâce à un scan multi-plateformes, triez-les avec un score calculé sur votre vrai profil, et générez pour chacune un CV et une lettre de motivation d'une page (compatibles ATS), sans jamais inventer une compétence que vous n'avez pas.
 
-Tout tourne sur votre machine : base SQLite locale, serveur limité à `127.0.0.1`, aucun compte à créer. Seuls sortent les recherches envoyées aux sites d'offres pendant un scan et, si vous utilisez une IA en ligne, les textes transmis au fournisseur que vous avez choisi, plus quelques requêtes techniques ([détail](CONFIDENTIALITE.md)).
+Tout tourne sur votre machine : base SQLite locale, serveur limité à `127.0.0.1`, aucun compte à créer (une version hébergée protégée par mot de passe est possible : [Hébergement en ligne](#hébergement-en-ligne)). Seuls sortent les recherches envoyées aux sites d'offres pendant un scan et, si vous utilisez une IA en ligne, les textes transmis au fournisseur que vous avez choisi, plus quelques requêtes techniques ([détail](CONFIDENTIALITE.md)).
 
 > Site et guide de démarrage : **https://latenightsbeats1208-pixel.github.io/jobscout/** · [Installation](INSTALL.md) · [Installation sur Mac](INSTALL-MAC.md) · [Guide de l'IA](GUIDE-IA.md) · [Conditions d'utilisation](CGU.md) · [Confidentialité](CONFIDENTIALITE.md)
 >
@@ -88,7 +88,7 @@ WTTJ est interrogée avec la clé de recherche (lecture seule) qu'utilise l'inte
 - **Secteur** (30 %) — titre et description comparés aux secteurs cibles du profil
 - **Compétences** (50 %) — une compétence ancrée dans une expérience pèse davantage qu'une compétence simplement listée
 - **Pays** (20 %) — 100 si le pays de l'offre fait partie des pays cibles, 0 sinon ; neutre si l'offre n'a pas de pays ou si aucun pays cible n'est déclaré
-- **Contrat** (±10) — selon les contrats recherchés du profil (`preferred_contracts`, par défaut CDI et CDD) : +10 si le contrat de l'offre en fait partie, neutre s'il est inconnu, −6 s'il est identifié mais non recherché
+- **Contrat** (±10) — selon les contrats recherchés du profil (`preferred_contracts`, par défaut CDI et CDD ; catégories CDI, CDD, V.I.E, stage, alternance, graduate program, ce dernier convenant aussi à qui cherche un CDI) : +10 si le contrat de l'offre en fait partie, neutre s'il est inconnu, −6 s'il est identifié mais non recherché
 - **Bonus Langue** (jusqu'à +8) — +8 si l'offre est rédigée dans une langue maîtrisée (B2+) ; +2,4 si elle n'est pas en anglais mais que l'utilisateur maîtrise l'anglais
 - **Bonus Durée V.I.E** (jusqu'à +5, V.I.E uniquement) — +5 pour 12–24 mois, +3 pour 6–11 mois
 
@@ -115,9 +115,19 @@ Coût : avec Claude (Anthropic), environ 0,12 à 0,20 $ par dossier (CV + lettre
 
 **Qualité selon le modèle** : les garde-fous anti-invention (validation contre le profil, limites de mise en page) s'appliquent quel que soit le modèle. Mais JobScout a été mis au point avec Claude : avec un autre modèle, relisez vos premiers documents. Si un modèle renvoie une réponse mal formée, JobScout tente un repli (mode JSON, extraction tolérante) avant d'afficher une erreur qui invite à choisir un modèle plus capable.
 
+## Candidatures par e-mail et spontanées
+- **Envoi par e-mail** depuis la fiche d'une offre : CV et lettre en PDF joints, message prérempli, candidature enregistrée comme « envoyée ». SMTP à renseigner au premier envoi (hôte, port, utilisateur, mot de passe d'application) ; l'adresse de candidature est cherchée dans l'annonce (`lib/mail/contact.ts`).
+- **Candidatures spontanées** : page *Spontanées*, import d'un fichier Excel ou CSV d'entreprises et d'adresses (`lib/mail/contacts-file.ts`, `lib/excel/contacts.ts`), liste paginée (25 par page).
+- **Vérification DNS** des adresses (le domaine accepte-t-il des e-mails ?) avant tout envoi ; un domaine invalide est refusé par l'API.
+- **Poste visé par contact** : saisi à la main, ou choisi par l'IA d'après l'adresse et le nom de l'entreprise (`lib/ai/choose-role.ts`) ; le CV est généré pour ce poste.
+
+## Hébergement en ligne
+Optionnel. `JOBSCOUT_HOSTED=1` protège tout le site (pages et API) par un mot de passe unique, `JOBSCOUT_ACCESS_PASSWORD`, sans compte utilisateur ; sans lui, le serveur ne sert rien. En local, rien ne change. Image Docker (avec Chromium), `compose.yml` et Caddy (HTTPS), workflow GitHub Actions qui publie l'image sur ghcr.io (amd64 et arm64) puis met le serveur à jour par SSH. Guide complet : [`DEPLOIEMENT.md`](DEPLOIEMENT.md).
+
 ## Sécurité
 
 - Serveur limité à `127.0.0.1` ; l'API refuse les requêtes venant d'un autre site ou d'un hôte non local (`middleware.ts`)
+- Version hébergée : mot de passe d'accès, session signée (`HttpOnly`, 7 jours), 5 essais par 15 minutes, actions réservées au poste local désactivées (voir [`DEPLOIEMENT.md`](DEPLOIEMENT.md))
 - Clés IA stockées en clair dans la base locale, jamais renvoyées au navigateur (seuls les 4 derniers caractères sont affichés)
 - Aucune télémétrie : JobScout n'envoie rien à son éditeur, et les scripts de lancement (`npm run dev`, `npm run build`) coupent celle de Next.js (`scripts/next.mjs`) — voir [Confidentialité](CONFIDENTIALITE.md)
 - Whitelist de colonnes sur la mise à jour des candidatures (anti mass-assignment)
@@ -127,6 +137,8 @@ Coût : avec Claude (Anthropic), environ 0,12 à 0,20 $ par dossier (CV + lettre
 ## Modes IA
 
 JobScout est gratuit (licence MIT), sans compte ni abonnement. Modes IA (`lib/ai/client.ts`) : `byok` (votre clé ou votre modèle local, fournisseur au choix) ; `unset` (rien de configuré : l'onboarding reste bloqué à l'import du CV). Le code contient aussi un mode `pack` (relais défini par `JOBSCOUT_PROXY_URL`) : il est inactif dans cette version, aucun relais n'étant configuré.
+
+**Secours automatique** : plusieurs fournisseurs peuvent être configurés ; si le fournisseur actif est injoignable, sans crédit ou à court de quota, JobScout passe au suivant dans l'ordre choisi (Profil › Secours automatique), puis écarte le fournisseur en échec 5 minutes (`lib/ai/llm.ts`). Une demande refusée ou une réponse mal formée ne déclenche pas de bascule.
 
 ## Tests
 
