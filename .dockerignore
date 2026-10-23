@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+.next
+data
+graphify-out
+installer
+tests
+docs
+*.db
+*.db-*
+.env
+.env.*
+!.env.example

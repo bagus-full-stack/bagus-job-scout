@@ -1,0 +1,26 @@
+# Serveur : docker compose up -d   (variables dans le fichier .env voisin, voir DEPLOIEMENT.md)
+services:
+  jobscout:
+    image: ghcr.io/bagus-full-stack/bagus-job-scout:latest
+    restart: unless-stopped
+    environment:
+      JOBSCOUT_ACCESS_PASSWORD: ${JOBSCOUT_ACCESS_PASSWORD:?définir JOBSCOUT_ACCESS_PASSWORD dans .env}
+      JOBSCOUT_SESSION_SECRET: ${JOBSCOUT_SESSION_SECRET:-}
+    volumes:
+      - jobscout-data:/data
+    # Pas de port publié : seul Caddy (HTTPS) est joignable de l'extérieur.
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [jobscout]
+    ports: ["80:80", "443:443"]
+    environment:
+      JOBSCOUT_DOMAIN: ${JOBSCOUT_DOMAIN:?définir JOBSCOUT_DOMAIN dans .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+
+volumes:
+  jobscout-data:
+  caddy-data:

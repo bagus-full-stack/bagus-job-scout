@@ -1,0 +1,4 @@
+# HTTPS automatique (Let's Encrypt) pour le domaine de JOBSCOUT_DOMAIN ; Caddy transmet l'adresse du visiteur.
+{$JOBSCOUT_DOMAIN} {
+	reverse_proxy jobscout:3000
+}
