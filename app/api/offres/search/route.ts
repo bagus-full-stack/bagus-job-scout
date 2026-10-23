@@ -16,6 +16,13 @@ export async function GET(req: NextRequest) {
   // Rayon en km (?radius=20, 0 = dans la commune) : seulement les valeurs du menu.
   const radius = (params.get("radius") ?? "").trim();
   const radiusKm = /^\d{1,3}$/.test(radius) && isDistanceRadius(Number(radius)) ? Number(radius) : null;
+  // Fourchette d'expérience du candidat (?expFrom=0&expTo=3), en années entières de 0 à 40.
+  const years = (key: string) => {
+    const raw = (params.get(key) ?? "").trim();
+    return /^\d{1,2}$/.test(raw) && Number(raw) <= 40 ? Number(raw) : null;
+  };
+  const expFrom = years("expFrom");
+  const expTo = years("expTo");
   const page = Number(params.get("page") ?? "1");
   const result = searchOffres({
     query: (params.get("q") ?? "").slice(0, 200),
@@ -30,6 +37,9 @@ export async function GET(req: NextRequest) {
     home: getDistanceHome(),
     radiusKm,
     includeUnlocated: params.get("unlocated") === "1",
+    expFrom,
+    expTo,
+    includeUnknownExp: params.get("unknownExp") === "1",
     page: Number.isFinite(page) ? page : 1,
   });
   return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });

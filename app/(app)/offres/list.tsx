@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn, formatRelativeDate, scoreColor } from "@/lib/utils";
 import type { OffreSummary, OffersSearch, OffersSort } from "@/lib/db/offres";
 import { CONTRACT_LABELS, CONTRACT_ORDER, type ContractCategory } from "@/lib/contracts";
+import { experienceLabel } from "@/lib/experience";
 import { SOURCES_META } from "@/lib/sources-meta";
 import { previewExcerpt } from "@/lib/offres/preview";
 import { DISTANCE_RADII, distanceLabel, isApproximate, radiusLabel } from "@/lib/distance/format";
@@ -54,6 +55,11 @@ export function OffresList({
   // Distance : rayon en km (0 = dans la commune), null = toutes distances.
   const [radius, setRadius] = useState<number | null>(null);
   const [includeUnlocated, setIncludeUnlocated] = useState(false);
+  // Expérience : fourchette d'années du candidat ("" = non limitée) ; les offres sans précision sont écartées sauf demande.
+  const [expFrom, setExpFrom] = useState("");
+  const [expTo, setExpTo] = useState("");
+  const [includeUnknownExp, setIncludeUnknownExp] = useState(false);
+  const expActive = expFrom !== "" || expTo !== "";
   const [result, setResult] = useState(initialResult);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -66,8 +72,8 @@ export function OffresList({
   const initialVieRef = useRef(initialVieOnly);
   const contractKey = [...contracts].sort().join(",");
   const vieFilter = contracts.has("vie");
-  const hasFilters = !!query || !!source || !!country || contracts.size > 0 || minScore || radius !== null;
-  const activeFilterCount = Number(!!source) + Number(!!country) + contracts.size + Number(minScore) + Number(radius !== null);
+  const hasFilters = !!query || !!source || !!country || contracts.size > 0 || minScore || radius !== null || expActive;
+  const activeFilterCount = Number(!!source) + Number(!!country) + contracts.size + Number(minScore) + Number(radius !== null) + Number(expActive);
   const distanceFacets = result.facets.distance;
   const home = distanceFacets.home;
   const { countries, sources, contractCounts } = result.facets;
@@ -123,6 +129,9 @@ export function OffresList({
     if (minScore) params.set("minScore", String(scoreThreshold));
     if (radius !== null) params.set("radius", String(radius));
     if (radius !== null && includeUnlocated) params.set("unlocated", "1");
+    if (expFrom !== "") params.set("expFrom", expFrom);
+    if (expTo !== "") params.set("expTo", expTo);
+    if (expActive && includeUnknownExp) params.set("unknownExp", "1");
     setLoading(true);
     setError(false);
     const timer = window.setTimeout(async () => {
@@ -143,10 +152,10 @@ export function OffresList({
       }
     }, page > 1 ? 0 : query ? 250 : 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [query, source, country, contractKey, minScore, scoreThreshold, sortBy, radius, includeUnlocated, page, refreshKey]);
+  }, [query, source, country, contractKey, minScore, scoreThreshold, sortBy, radius, includeUnlocated, expFrom, expTo, includeUnknownExp, page, refreshKey]);
 
   function reset() {
-    setQuery(""); setSource(""); setCountry(""); setContracts(new Set()); setMinScore(false); setRadius(null); setIncludeUnlocated(false); setSelectedId(null); setFiltersExpanded(false); setPage(1);
+    setQuery(""); setSource(""); setCountry(""); setContracts(new Set()); setMinScore(false); setRadius(null); setIncludeUnlocated(false); setExpFrom(""); setExpTo(""); setIncludeUnknownExp(false); setSelectedId(null); setFiltersExpanded(false); setPage(1);
   }
 
   useEffect(() => {
@@ -246,6 +255,25 @@ export function OffresList({
                 : `${numberFormat.format(distanceFacets.unlocated)} offre${distanceFacets.unlocated > 1 ? "s" : ""} en France sans ville précise (télétravail, lieu non indiqué) non comptée${distanceFacets.unlocated > 1 ? "s" : ""}.`}{" "}
               <button type="button" onClick={() => { setIncludeUnlocated(!includeUnlocated); setPage(1); }} className="font-semibold text-accent hover:underline">
                 {includeUnlocated ? "Les retirer" : "Les inclure"}
+              </button>
+            </span>
+          )}
+          <label className="inline-flex items-center gap-1.5 text-small text-textSecondary">
+            Expérience
+            <input type="number" min={0} max={40} inputMode="numeric" value={expFrom} placeholder="0" aria-label="Expérience minimale en années" className="h-9 w-16 rounded-md border border-border bg-bg px-2 text-small text-text focus:border-accent focus:outline-none"
+              onChange={(event) => { setExpFrom(event.target.value.replace(/\D/g, "").slice(0, 2)); setPage(1); }} />
+            à
+            <input type="number" min={0} max={40} inputMode="numeric" value={expTo} placeholder="∞" aria-label="Expérience maximale en années" className="h-9 w-16 rounded-md border border-border bg-bg px-2 text-small text-text focus:border-accent focus:outline-none"
+              onChange={(event) => { setExpTo(event.target.value.replace(/\D/g, "").slice(0, 2)); setPage(1); }} />
+            ans
+          </label>
+          {expActive && result.facets.experience.unknown > 0 && (
+            <span className="text-caption text-textSecondary">
+              {includeUnknownExp
+                ? `Dont ${numberFormat.format(result.facets.experience.unknown)} offre${result.facets.experience.unknown > 1 ? "s" : ""} sans expérience précisée.`
+                : `${numberFormat.format(result.facets.experience.unknown)} offre${result.facets.experience.unknown > 1 ? "s" : ""} sans expérience précisée non comptée${result.facets.experience.unknown > 1 ? "s" : ""}.`}{" "}
+              <button type="button" onClick={() => { setIncludeUnknownExp(!includeUnknownExp); setPage(1); }} className="font-semibold text-accent hover:underline">
+                {includeUnknownExp ? "Les retirer" : "Les inclure"}
               </button>
             </span>
           )}
@@ -372,6 +400,7 @@ function OfferPreview({ offer }: { offer: OffreSummary }) {
         )}
         {offer.posted_at && <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-4 w-4" /> {formatRelativeDate(offer.posted_at)}</span>}
         {offer.contract_category !== "autre" && <span>{CONTRACT_LABELS[offer.contract_category]}</span>}
+        {offer.experience && <span>{experienceLabel(offer.experience)}</span>}
       </div>
       <div className="py-5">
         <p className="text-small font-semibold">Pourquoi cette offre ?</p>

@@ -5,6 +5,7 @@ import { getDb, asJson, parseJson } from "./index";
 import type { ScrapedOffre } from "@/lib/scrapers/base";
 import type { ScoreResult } from "@/lib/ai/score-offre";
 import { classifyContract, CONTRACT_ORDER, type ContractCategory } from "@/lib/contracts";
+import { experienceMatches, extractExperience, type Experience } from "@/lib/experience";
 import { fixMojibake, sanitizeScrapedOffre } from "@/lib/offres/clean-text";
 import { ensureOffresRepaired } from "./repair-markup";
 
@@ -59,6 +60,8 @@ export type OffreSummary = Pick<
   "posted_at" | "score" | "is_vie" | "description_status" | "contract_category" |
   "has_cv" | "has_lm"
 > & {
+  /** Expérience demandée, lue dans l'annonce ; null = non précisée. */
+  experience: Experience | null;
   description_text: string;
   score_reason: string | null;
   /** Distance à vol d'oiseau depuis la ville de référence (km), null si inconnue ou sans ville. */
@@ -101,7 +104,7 @@ export type OffersSearch = {
   offers: OffreSummary[];
   total: number;
   pageSize: number;
-  facets: BaseFacets & { distance: DistanceFacets };
+  facets: BaseFacets & { distance: DistanceFacets; experience: { unknown: number } };
 };
 
 const OFFER_PAGE_SIZE = 24;
@@ -221,6 +224,7 @@ function buildOffresCache(fingerprint: string): OffresCache {
       company: row.company, country: row.country, location: row.location,
       posted_at: row.posted_at, score: row.score, is_vie: row.is_vie,
       description_status: row.description_status, contract_category,
+      experience: extractExperience(row.title, row.head ?? ""),
       has_cv: !!row.has_cv, has_lm: !!row.has_lm,
       // substr() compte des caractères, slice() des unités UTF-16 (émojis) : on
       // recoupe pour rendre exactement l’extrait d’avant.
@@ -316,6 +320,11 @@ export function searchOffres(opts: {
   radiusKm?: number | null;
   /** Avec un rayon : garder aussi les offres dont la distance est inconnue. */
   includeUnlocated?: boolean;
+  /** Années d'expérience du candidat (fourchette) : garde les offres dont l'exigence chevauche cette fourchette. */
+  expFrom?: number | null;
+  expTo?: number | null;
+  /** Avec une fourchette : garder aussi les offres qui ne précisent pas l'expérience. */
+  includeUnknownExp?: boolean;
   page?: number;
 } = {}): OffersSearch {
   const cache = getOffresCache();
@@ -323,6 +332,10 @@ export function searchOffres(opts: {
   const haystacks = query ? getHaystacks(cache) : null;
   const contracts = new Set(opts.contracts ?? []);
   const minScore = opts.minScore === true ? 60 : typeof opts.minScore === "number" ? opts.minScore : 0;
+  const expActive = typeof opts.expFrom === "number" || typeof opts.expTo === "number";
+  const expFrom = opts.expFrom ?? 0;
+  const expTo = opts.expTo ?? 99;
+  let expUnknown = 0;
   const filtered = cache.smart.filter((row) => {
     if (haystacks && !(haystacks.get(row.id) ?? "").includes(query)) return false;
     if (opts.source && row.source !== opts.source) return false;
@@ -330,6 +343,13 @@ export function searchOffres(opts: {
     if (contracts.size && !contracts.has(row.contract_category)) return false;
     if (minScore > 0 && (row.score ?? 0) < minScore) return false;
     if (opts.vieOnly && row.contract_category !== "vie") return false;
+    if (expActive) {
+      if (!row.experience) {
+        expUnknown++;
+        return !!opts.includeUnknownExp;
+      }
+      if (!experienceMatches(row.experience, expFrom, expTo)) return false;
+    }
     return true;
   });
 
@@ -408,6 +428,7 @@ export function searchOffres(opts: {
       description_text: row.excerpt,
       score_reason: parseJson<{ reason?: string } | null>(row.score_breakdown, null)?.reason ?? null,
       contract_category: row.contract_category,
+      experience: row.experience,
       has_cv: row.has_cv, has_lm: row.has_lm,
       distance_km: distances.get(row.id) ?? null,
       same_city: sameCity.has(row.id),
@@ -423,6 +444,8 @@ export function searchOffres(opts: {
         home: home ? { code: home.code, label: home.label } : null,
         counts, located, unlocated: home ? unlocatedFr : 0,
       },
+      // Avec une fourchette d'expérience : offres filtrées qui ne l'indiquent pas.
+      experience: { unknown: expActive ? expUnknown : 0 },
     },
   };
 }
