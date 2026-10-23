@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { runAuto, type AutoItem, type AutoJob } from "@/lib/auto/spontaneous";
+import { runAuto, type AutoItem, type AutoJob } from "@/lib/auto/apply";
 
 const job = (n: number): AutoJob => ({
+  kind: "spontanees",
   running: true,
   stopping: false,
   startedAt: new Date().toISOString(),
   finishedAt: null,
   stopReason: null,
-  items: Array.from({ length: n }, (_, i): AutoItem => ({ id: i + 1, company: `Acme ${i + 1}`, email: `rh${i + 1}@acme.test`, state: "waiting" })),
+  items: Array.from({ length: n }, (_, i): AutoItem => ({ id: i + 1, kind: "spontanees", company: `Acme ${i + 1}`, email: `rh${i + 1}@acme.test`, state: "waiting" })),
 });
 
 const mk = (apply: (i: AutoItem) => Promise<void>, over: Partial<Parameters<typeof runAuto>[1]> = {}) => {

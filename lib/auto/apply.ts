@@ -7,15 +7,18 @@ import { getProfile } from "@/lib/db/queries";
 import { buildDocFilename, listDocuments } from "@/lib/db/documents";
 import { createCandidature, updateCandidature } from "@/lib/db/candidatures";
 import { listSpontaneous, setAutoResult } from "@/lib/db/spontanees";
-import { isEmail } from "@/lib/mail/contact";
+import { SPONTANEOUS_SOURCE } from "@/lib/mail/contacts-file";
+import { findApplyEmail, isEmail } from "@/lib/mail/contact";
 import { mailDraft } from "@/lib/mail/draft";
 import { getMailConfig, sendMail } from "@/lib/mail/send";
 import { checkDomain } from "@/lib/mail/dns-check";
 import { detectDocLanguage, sourceLanguageHint } from "@/lib/text/lang";
 
 /**
- * Candidature spontanée automatique : pour chaque contact éligible, génère le CV et la lettre (s'ils n'existent pas
- * déjà), envoie le mail et enregistre la candidature « envoyée ». Un seul lot à la fois, dans ce processus.
+ * Candidature automatique, pour les contacts spontanés (`kind: "spontanees"`) comme pour les offres des sources qui
+ * donnent une adresse de candidature (`kind: "offres"`) : génère le CV et la lettre (s'ils n'existent pas déjà),
+ * envoie le mail et enregistre la candidature « envoyée ». Un seul lot à la fois, dans ce processus.
+ * Les offres sans adresse (candidature par formulaire sur le site de la source) ne sont jamais traitées.
  *
  * Garde-fous, parce qu'un envoi ne se rattrape pas : lot borné (AUTO_MAX), pause aléatoire entre deux envois
  * (jamais de rafale), arrêt à la demande, arrêt après AUTO_MAX_FAILS échecs de suite ou si la messagerie refuse
@@ -26,8 +29,12 @@ export const AUTO_DEFAULT = 10;
 const AUTO_MAX_FAILS = 3;
 export const PAUSE_MS: [number, number] = [45_000, 120_000];
 
-export type AutoItem = { id: number; company: string; email: string; state: "waiting" | "running" | "sent" | "failed"; error?: string };
+export type AutoKind = "spontanees" | "offres";
+export const AUTO_MIN_SCORE = 70;
+
+export type AutoItem = { id: number; kind: AutoKind; company: string; title?: string; email: string; state: "waiting" | "running" | "sent" | "failed"; error?: string };
 export type AutoJob = {
+  kind: AutoKind;
   running: boolean;
   stopping: boolean;
   startedAt: string;
@@ -43,6 +50,28 @@ export const getAutoJob = (): AutoJob | null => g.__jobscoutAuto ?? null;
 /** Contacts qu'on peut candidater : adresse valide, domaine qui reçoit du courrier, aucune candidature encore. */
 export function eligibleContacts() {
   return listSpontaneous().filter((c) => !c.status && c.dns !== "invalid" && isEmail(c.email));
+}
+
+/**
+ * Offres des sources prêtes à candidater : score suffisant, aucune candidature, pas d'échec d'envoi automatique
+ * antérieur (à retenter à la main), et une adresse de candidature dans l'annonce. Les meilleures d'abord.
+ */
+export function eligibleOffres(minScore: number): { id: number; company: string; title: string; email: string }[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT o.id, o.company, o.title, o.description_text AS text FROM offres o
+       WHERE o.source <> ? AND o.score >= ?
+         AND NOT EXISTS (SELECT 1 FROM candidatures c WHERE c.offre_id = o.id)
+         AND (NOT json_valid(o.raw_payload) OR json_extract(o.raw_payload, '$.auto_error') IS NULL)
+       ORDER BY o.score DESC, o.id DESC`
+    )
+    .all(SPONTANEOUS_SOURCE, minScore) as { id: number; company: string; title: string; text: string }[];
+  const out: { id: number; company: string; title: string; email: string }[] = [];
+  for (const r of rows) {
+    const email = findApplyEmail(r.text);
+    if (email && isEmail(email)) out.push({ id: r.id, company: r.company, title: r.title, email });
+  }
+  return out;
 }
 
 class SkipError extends Error {}
@@ -79,7 +108,7 @@ async function applyOne(item: AutoItem): Promise<void> {
     fullName: profile.full_name ?? "",
     phone: profile.phone,
     email: profile.email,
-    spontaneous: true,
+    spontaneous: item.kind === "spontanees",
   });
   await sendMail({
     to: item.email,
@@ -159,17 +188,24 @@ export async function runAuto(job: AutoJob, deps: Deps = realDeps): Promise<void
 
 export type StartResult = { ok: true; job: AutoJob } | { ok: false; error: string };
 
-export function startAuto(count: number, deps?: Deps): StartResult {
+export function startAuto(kind: AutoKind, count: number, minScore = AUTO_MIN_SCORE, deps?: Deps): StartResult {
   if (getAutoJob()?.running) return { ok: false, error: "Un lot est déjà en cours." };
   if (!getMailConfig()) return { ok: false, error: "Messagerie non configurée : renseignez-la dans Profil › Messagerie." };
   if (!getProfile()) return { ok: false, error: "Profil introuvable." };
   const n = Math.floor(count);
   if (!(n >= 1 && n <= AUTO_MAX)) return { ok: false, error: `Choisissez entre 1 et ${AUTO_MAX} candidatures.` };
-  const items: AutoItem[] = eligibleContacts()
-    .slice(0, n)
-    .map((c) => ({ id: c.id, company: c.company, email: c.email, state: "waiting" }));
-  if (!items.length) return { ok: false, error: "Aucun contact éligible : tous ont déjà une candidature ou un domaine injoignable." };
-  const job: AutoJob = { running: true, stopping: false, startedAt: new Date().toISOString(), finishedAt: null, stopReason: null, items };
+  const pool: Omit<AutoItem, "kind" | "state">[] =
+    kind === "offres" ? eligibleOffres(Math.max(0, Math.min(100, Math.floor(minScore) || 0))) : eligibleContacts();
+  const items: AutoItem[] = pool.slice(0, n).map((c) => ({ id: c.id, kind, company: c.company, title: c.title, email: c.email, state: "waiting" }));
+  if (!items.length)
+    return {
+      ok: false,
+      error:
+        kind === "offres"
+          ? `Aucune offre éligible : il faut un score d'au moins ${minScore}, une adresse de candidature dans l'annonce et aucune candidature existante.`
+          : "Aucun contact éligible : tous ont déjà une candidature ou un domaine injoignable.",
+    };
+  const job: AutoJob = { kind, running: true, stopping: false, startedAt: new Date().toISOString(), finishedAt: null, stopReason: null, items };
   g.__jobscoutAuto = job;
   void runAuto(job, deps);
   return { ok: true, job };

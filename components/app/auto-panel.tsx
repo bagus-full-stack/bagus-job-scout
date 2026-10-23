@@ -7,35 +7,52 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
-type Item = { id: number; company: string; email: string; state: "waiting" | "running" | "sent" | "failed"; error?: string };
-type Job = { running: boolean; stopping: boolean; startedAt: string; finishedAt: string | null; stopReason: string | null; items: Item[] };
-type State = { job: Job | null; eligible: number; smtp: boolean; max: number; defaultCount: number };
+type Kind = "spontanees" | "offres";
+type Item = { id: number; company: string; title?: string; email: string; state: "waiting" | "running" | "sent" | "failed"; error?: string };
+type Job = { kind: Kind; running: boolean; stopping: boolean; startedAt: string; finishedAt: string | null; stopReason: string | null; items: Item[] };
+type State = { job: Job | null; eligible: number; smtp: boolean; max: number; defaultCount: number; minScore: number };
 
 const STATE_LABEL: Record<Item["state"], string> = { waiting: "En attente", running: "En cours…", sent: "Envoyée", failed: "Échec" };
 
+const TEXT: Record<Kind, { intro: string; noun: string }> = {
+  spontanees: {
+    intro: "Génère le CV et la lettre de chaque contact puis envoie le mail, sans relecture. Les contacts déjà candidatés et les domaines injoignables sont ignorés.",
+    noun: "contact",
+  },
+  offres: {
+    intro:
+      "Pour les offres dont l'annonce donne une adresse de candidature : génère le CV et la lettre puis envoie le mail, sans relecture, en commençant par les mieux notées. Les autres offres (candidature sur le site de la source) ne sont pas concernées, ni celles déjà candidatées.",
+    noun: "offre",
+  },
+};
+
 /** Candidature automatique : lance un lot, suit chaque envoi, permet d'arrêter. */
-export function AutoPanel() {
+export function AutoPanel({ kind }: { kind: Kind }) {
   const router = useRouter();
   const [s, setS] = useState<State | null>(null);
   const [count, setCount] = useState<number | null>(null);
+  const [minScore, setMinScore] = useState(70);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wasRunning = useRef(false);
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch("/api/offres/spontanees/auto", { cache: "no-store" });
+      const r = await fetch(`/api/offres/spontanees/auto?kind=${kind}&minScore=${minScore}`, { cache: "no-store" });
       if (r.ok) setS(await r.json());
     } catch {
       /* le prochain tour réessaie */
     }
-  }, []);
+  }, [kind, minScore]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const running = !!s?.job?.running;
+  // Un seul lot à la fois : s'il est d'un autre type, ce panneau l'indique sans l'afficher.
+  const mine = s?.job?.kind === kind;
+  const otherRunning = !!s?.job?.running && !mine;
+  const running = !!s?.job?.running && mine;
   useEffect(() => {
     if (!running) return;
     const t = setInterval(load, 3000);
@@ -49,7 +66,8 @@ export function AutoPanel() {
   }, [running, router]);
 
   if (!s) return null;
-  const job = s.job;
+  const job = mine ? s.job : null;
+  const noun = TEXT[kind].noun;
   const n = Math.min(count ?? s.defaultCount, s.eligible, s.max);
 
   async function call(method: "POST" | "DELETE", body?: unknown) {
@@ -59,7 +77,7 @@ export function AutoPanel() {
       const res = await fetch("/api/offres/spontanees/auto", {
         method,
         headers: { "content-type": "application/json" },
-        body: body ? JSON.stringify(body) : undefined,
+        body: body ? JSON.stringify({ ...body, kind, minScore }) : undefined,
       });
       const d = await res.json().catch(() => null);
       if (!res.ok) return setError(d?.error || `Erreur serveur (HTTP ${res.status}).`);
@@ -72,7 +90,7 @@ export function AutoPanel() {
   function start() {
     if (
       !window.confirm(
-        `Envoyer ${n} candidature${n > 1 ? "s" : ""} spontanée${n > 1 ? "s" : ""} automatiquement, sans relecture ?\n\nPour chaque contact, JobScout génère le CV et la lettre puis envoie le mail depuis votre adresse, avec une pause de 1 à 2 minutes entre deux envois. Un envoi ne peut pas être annulé. Vous pouvez arrêter le lot à tout moment.`
+        `Envoyer ${n} candidature${n > 1 ? "s" : ""}${kind === "spontanees" ? " spontanée" + (n > 1 ? "s" : "") : ""} automatiquement, sans relecture ?\n\nPour chaque contact, JobScout génère le CV et la lettre puis envoie le mail depuis votre adresse, avec une pause de 1 à 2 minutes entre deux envois. Un envoi ne peut pas être annulé. Vous pouvez arrêter le lot à tout moment.`
       )
     )
       return;
@@ -91,15 +109,29 @@ export function AutoPanel() {
         <h3 className="font-display text-h3">Candidature automatique</h3>
       </div>
 
-      {!running && (
+      {otherRunning && <p className="mt-2 text-small text-warning">Un lot de candidatures est en cours ailleurs : attendez sa fin ou arrêtez-le.</p>}
+      {!running && !otherRunning && (
         <>
           <p className="text-small text-textSecondary">
-            Génère le CV et la lettre de chaque contact puis envoie le mail, sans relecture, avec une pause de 1 à 2 minutes entre deux envois. Les contacts déjà candidatés et
-            les domaines injoignables sont ignorés. {s.eligible} contact{s.eligible > 1 ? "s" : ""} éligible{s.eligible > 1 ? "s" : ""}.
+            {TEXT[kind].intro} Pause de 1 à 2 minutes entre deux envois. {s.eligible} {noun}
+            {s.eligible > 1 ? "s" : ""} éligible{s.eligible > 1 ? "s" : ""}.
           </p>
           {!s.smtp && <p className="mt-2 text-small text-warning">Messagerie non configurée : renseignez-la dans <Link href="/profile" className="underline">Profil › Messagerie</Link>.</p>}
           {s.eligible > 0 && s.smtp && (
             <div className="mt-3 flex flex-wrap items-center gap-3">
+              {kind === "offres" && (
+                <label className="flex items-center gap-2 text-small">
+                  Score minimum
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={minScore}
+                    onChange={(e) => setMinScore(Math.max(0, Math.min(100, Math.floor(Number(e.target.value)) || 0)))}
+                    className="h-9 w-20 rounded-md border border-border bg-surface px-2 text-small"
+                  />
+                </label>
+              )}
               <label className="flex items-center gap-2 text-small">
                 Nombre
                 <input
@@ -151,7 +183,7 @@ export function AutoPanel() {
             {job.items.map((i) => (
               <li key={i.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
                 {i.state === "sent" ? <Check className="h-4 w-4 text-success" /> : i.state === "failed" ? <X className="h-4 w-4 text-danger" /> : i.state === "running" ? <Spinner size={14} /> : <span className="w-4" />}
-                <span className="min-w-0 flex-1 truncate font-semibold">{i.company}</span>
+                <span className="min-w-0 flex-1 truncate font-semibold">{i.company}{i.title ? <span className="font-normal text-textSecondary"> · {i.title}</span> : null}</span>
                 <span className="truncate text-textSecondary">{i.email}</span>
                 <span className={i.state === "failed" ? "text-danger" : i.state === "sent" ? "text-success" : "text-textSecondary"}>{STATE_LABEL[i.state]}</span>
                 {i.error && <span className="basis-full pl-7 text-caption text-danger">{i.error}</span>}

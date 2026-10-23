@@ -39,11 +39,11 @@ export function listSpontaneous(): SpontaneousContact[] {
     .map((r) => ({ ...(r as SpontaneousContact) }));
 }
 
-/** Garde le résultat de l'envoi automatique dans le contact : un message d'échec, ou `null` pour l'effacer. */
+/** Garde le résultat de l'envoi automatique sur l'offre ou le contact : un message d'échec, ou `null` pour l'effacer. */
 export function setAutoResult(id: number, error: string | null): void {
   getDb()
-    .prepare(`UPDATE offres SET raw_payload = json_set(${SAFE_JSON}, '$.auto_error', ?) WHERE id = ? AND source = ?`)
-    .run(error, id, SPONTANEOUS_SOURCE);
+    .prepare(`UPDATE offres SET raw_payload = json_set(${SAFE_JSON}, '$.auto_error', ?) WHERE id = ?`)
+    .run(error, id);
 }
 
 /** Contrôle DNS des contacts (tous, ou ceux d'`ids`) ; le résultat est gardé dans leur raw_payload. */

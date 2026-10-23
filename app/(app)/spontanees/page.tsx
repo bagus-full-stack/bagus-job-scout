@@ -9,7 +9,7 @@ import { RoleEditor, BulkRole } from "./role-editor";
 import { getProfile } from "@/lib/db/queries";
 import { VerifyButton } from "./verify-button";
 import { AiRoleButton } from "./ai-role-button";
-import { AutoPanel } from "./auto-panel";
+import { AutoPanel } from "@/components/app/auto-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +65,7 @@ export default async function SpontaneesPage({ searchParams }: { searchParams: P
         </div>
       ) : (
         <>
-        <AutoPanel />
+        <AutoPanel kind="spontanees" />
       <BulkRole options={roles} />
         <ul className="glass-panel divide-y divide-border">
           {contacts.map((c) => (

@@ -3,6 +3,7 @@ import { getDistanceHome, suggestedDistanceHome } from "@/lib/distance/home";
 import { PageHeader } from "@/components/app/page-header";
 import { OffresList } from "./list";
 import { ScanButton } from "./scan-button";
+import { AutoPanel } from "@/components/app/auto-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export default async function OffresPage({ searchParams }: { searchParams: Promi
         subtitle={subtitle}
         actions={<ScanButton />}
       />
+      <AutoPanel kind="offres" />
       <OffresList initialResult={initial} initialVieOnly={vieOnly} initialMinScore={minScore} homeSuggestion={homeSuggestion} />
     </>
   );
