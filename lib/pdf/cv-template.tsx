@@ -37,9 +37,9 @@ const makeStyles = (fs: number) =>
       lineHeight: 1.18,
       color: "#000000",
     },
-    name: { textAlign: "center", fontSize: fs + 8, fontFamily: "Times-Bold", marginBottom: fs * 0.4 },
-    headline: { textAlign: "center", fontSize: fs + 4, fontFamily: "Times-Bold", marginBottom: fs * 0.4 },
-    contactRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center" },
+    name: { textAlign: "center", fontSize: fs + 8, fontFamily: "Times-Bold", marginBottom: fs * 0.9 },
+    headline: { textAlign: "center", fontSize: fs + 4, fontFamily: "Times-Bold", marginBottom: fs * 0.9 },
+    contactRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", marginBottom: fs * 0.35 },
     contactSep: { marginHorizontal: 4 },
     link: { color: "#0000ff", textDecoration: "none" },
     sectionTitle: {
@@ -153,6 +153,8 @@ function ContactRow({ items, st }: { items: ContactItem[]; st: CvStyles }) {
   );
 }
 
+// Un lien doit avoir un nom de domaine : l'import des CV a parfois enregistré le texte « GitHub » comme URL.
+const isValidUrl = (u: string | null | undefined): u is string => !!u && /^(https?:\/\/)?[^\s/]+\.[a-z]{2,}/i.test(u.trim());
 const absoluteUrl = (u: string) => (/^https?:\/\//i.test(u) ? u : `https://${u}`);
 
 export function CVDocument({
@@ -246,7 +248,7 @@ export function CVDocument({
                   items={p.bullet_points ?? []}
                   ty={ty}
                   st={st}
-                  link={p.url ? { src: absoluteUrl(p.url), label: /github\.com/i.test(p.url) ? "GitHub" : displayUrl(p.url) } : null}
+                  link={isValidUrl(p.url) ? { src: absoluteUrl(p.url), label: /github\.com/i.test(p.url) ? "GitHub" : displayUrl(p.url) } : null}
                 />
               </View>
             ))}
