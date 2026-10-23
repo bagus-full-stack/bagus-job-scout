@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { AlertCircle, Check, Search } from "lucide-react";
+import { AlertCircle, Check, ExternalLink, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -51,7 +51,10 @@ export function GoogleSettings() {
       <p className="text-small text-textSecondary">
         Cherche les posts LinkedIn publics qui annoncent un recrutement, sans jamais contacter LinkedIn : seuls les extraits que Google a indexés sont lus, par l'intermédiaire de
         SerpAPI. Créez un compte sur serpapi.com et collez votre clé API ci-dessous (une page de 10 résultats = une recherche de votre forfait ; l'offre gratuite est limitée). Activez
-        ensuite la source dans Profil › Recherche › Sources. La clé est chiffrée dans la base locale et n'est jamais renvoyée au navigateur.
+        ensuite la source dans Profil › Recherche › Sources. La clé est chiffrée dans la base locale et n'est jamais renvoyée au navigateur.{" "}
+        <a className="inline-flex items-center gap-0.5 text-accent hover:underline" href="https://serpapi.com/manage-api-key" target="_blank" rel="noreferrer">
+          Créer une clé <ExternalLink className="h-3 w-3" />
+        </a>
       </p>
       <div className="mt-4">
         <Input

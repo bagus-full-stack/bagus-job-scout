@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { AlertCircle, Check, Mail } from "lucide-react";
+import { AlertCircle, Check, ExternalLink, Mail } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -53,7 +53,10 @@ export function MailSettings() {
       </div>
       <p className="text-small text-textSecondary">
         Un seul réglage pour tous les envois (candidatures sur offre et spontanées). Gmail : activez la validation en 2 étapes, puis créez un « mot de passe d'application ». Le mot de
-        passe reste dans la base locale et n'est jamais renvoyé au navigateur.
+        passe reste dans la base locale et n'est jamais renvoyé au navigateur.{" "}
+        <a className="inline-flex items-center gap-0.5 text-accent hover:underline" href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer">
+          Créer un mot de passe d'application <ExternalLink className="h-3 w-3" />
+        </a>
       </p>
       <div className="mt-4 space-y-2">
         <div className="flex gap-2">
