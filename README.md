@@ -116,9 +116,12 @@ Coût : avec Claude (Anthropic), environ 0,12 à 0,20 $ par dossier (CV + lettre
 **Qualité selon le modèle** : les garde-fous anti-invention (validation contre le profil, limites de mise en page) s'appliquent quel que soit le modèle. Mais JobScout a été mis au point avec Claude : avec un autre modèle, relisez vos premiers documents. Si un modèle renvoie une réponse mal formée, JobScout tente un repli (mode JSON, extraction tolérante) avant d'afficher une erreur qui invite à choisir un modèle plus capable.
 
 ## Candidatures par e-mail et spontanées
-- **Envoi par e-mail** depuis la fiche d'une offre : CV et lettre en PDF joints, message prérempli, candidature enregistrée comme « envoyée ». SMTP à renseigner au premier envoi (hôte, port, utilisateur, mot de passe d'application) ; l'adresse de candidature est cherchée dans l'annonce (`lib/mail/contact.ts`).
+- **Envoi par e-mail** depuis la fiche d'une offre : CV et lettre en PDF joints, message prérempli, candidature enregistrée comme « envoyée ». SMTP à renseigner une fois pour tous les envois, dans Profil › Messagerie (hôte, port, utilisateur, mot de passe d'application) ; l'adresse de candidature est cherchée dans l'annonce (`lib/mail/contact.ts`).
 - **Candidatures spontanées** : page *Spontanées*, import d'un fichier Excel ou CSV d'entreprises et d'adresses (`lib/mail/contacts-file.ts`, `lib/excel/contacts.ts`), liste paginée (25 par page).
 - **Vérification DNS** des adresses (le domaine accepte-t-il des e-mails ?) avant tout envoi ; un domaine invalide est refusé par l'API.
+- **Candidature automatique** (page *Spontanées* et page *Offres*) : un lot de 1 à 50 candidatures, sans relecture. Pour chaque cible, JobScout génère le CV et la lettre s'ils n'existent pas, envoie le mail et enregistre la candidature « envoyée ». Sur *Offres*, seules les offres dont l'annonce donne une adresse de candidature, avec un score minimum réglable (70 par défaut) et sans candidature existante, sont concernées, les mieux notées d'abord ; celles où l'on postule sur le site de la source restent à faire à la main (`lib/auto/apply.ts`).
+  - Suivi en direct : envoyées, échecs, contact en cours ; échec conservé sur la cible et écarté des lots suivants pour les offres.
+  - Garde-fous : pause de 45 à 120 s entre deux envois, bouton « Arrêter », arrêt après 3 échecs de suite ou si la messagerie refuse l'identifiant, jamais deux candidatures pour la même cible, un seul lot à la fois.
 - **Poste visé par contact** : saisi à la main, ou choisi par l'IA d'après l'adresse et le nom de l'entreprise (`lib/ai/choose-role.ts`) ; le CV est généré pour ce poste.
 
 ## Hébergement en ligne
