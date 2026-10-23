@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 
-/** Clé de l'API Google Programmable Search, pour la source « Posts LinkedIn (via Google) ». */
+/** Clé SerpAPI, pour la source « Posts LinkedIn (via Google) ». */
 export function GoogleSettings() {
-  const [cfg, setCfg] = useState<{ configured: boolean; cx: string } | null>(null);
+  const [configured, setConfigured] = useState<boolean | null>(null);
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -16,27 +16,26 @@ export function GoogleSettings() {
   useEffect(() => {
     fetch("/api/settings/google")
       .then((r) => r.json())
-      .then(setCfg)
-      .catch(() => setMsg({ ok: false, text: "Réglages Google illisibles." }));
+      .then((d: { configured: boolean }) => setConfigured(d.configured))
+      .catch(() => setMsg({ ok: false, text: "Réglages SerpAPI illisibles." }));
   }, []);
 
-  if (!cfg) return null;
+  if (configured === null) return null;
 
   async function save() {
-    if (!cfg) return;
     setBusy(true);
     setMsg(null);
     try {
       const res = await fetch("/api/settings/google", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ cx: cfg.cx, key }),
+        body: JSON.stringify({ key }),
       });
       const d = await res.json().catch(() => null);
       if (!res.ok) return setMsg({ ok: false, text: d?.error || `Erreur serveur (HTTP ${res.status}).` });
       setKey("");
-      setCfg({ ...cfg, configured: true });
-      setMsg({ ok: true, text: "Réglages Google enregistrés." });
+      setConfigured(true);
+      setMsg({ ok: true, text: "Clé SerpAPI enregistrée." });
     } finally {
       setBusy(false);
     }
@@ -47,25 +46,24 @@ export function GoogleSettings() {
       <div className="mb-1 flex items-center gap-2">
         <Search className="h-4 w-4 text-accent" />
         <h3 className="font-display text-h3">Posts LinkedIn (via Google)</h3>
-        {cfg.configured && <span className="text-caption text-success">Configuré</span>}
+        {configured && <span className="text-caption text-success">Configuré</span>}
       </div>
       <p className="text-small text-textSecondary">
-        Cherche les posts LinkedIn publics qui annoncent un recrutement, sans jamais contacter LinkedIn : seuls les extraits indexés par Google sont lus. Créez un moteur sur
-        programmablesearchengine.google.com (« Rechercher sur tout le web »), puis une clé API « Custom Search API » sur console.cloud.google.com. Gratuit jusqu'à 100 requêtes par jour (une page de
-        10 résultats = une requête). Activez ensuite la source dans Profil › Recherche › Sources. La clé est chiffrée dans la base locale et n'est jamais renvoyée au navigateur.
+        Cherche les posts LinkedIn publics qui annoncent un recrutement, sans jamais contacter LinkedIn : seuls les extraits que Google a indexés sont lus, par l'intermédiaire de
+        SerpAPI. Créez un compte sur serpapi.com et collez votre clé API ci-dessous (une page de 10 résultats = une recherche de votre forfait ; l'offre gratuite est limitée). Activez
+        ensuite la source dans Profil › Recherche › Sources. La clé est chiffrée dans la base locale et n'est jamais renvoyée au navigateur.
       </p>
-      <div className="mt-4 space-y-2">
-        <Input value={cfg.cx} onChange={(e) => setCfg({ ...cfg, cx: e.target.value })} placeholder="Identifiant du moteur (cx)" aria-label="Identifiant du moteur (cx)" />
+      <div className="mt-4">
         <Input
           type="password"
           autoComplete="off"
           value={key}
           onChange={(e) => setKey(e.target.value)}
-          placeholder={cfg.configured ? "Clé inchangée" : "Clé API"}
-          aria-label="Clé API Google"
+          placeholder={configured ? "Clé inchangée (saisissez-en une pour la remplacer)" : "Clé API SerpAPI"}
+          aria-label="Clé API SerpAPI"
         />
       </div>
-      <Button className="mt-4" variant="secondary" onClick={save} disabled={busy}>
+      <Button className="mt-4" variant="secondary" onClick={save} disabled={busy || !key.trim()}>
         {busy ? <Spinner size={16} className="text-current" /> : <Check className="h-4 w-4" />}
         Enregistrer
       </Button>

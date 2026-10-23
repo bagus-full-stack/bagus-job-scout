@@ -112,7 +112,7 @@ Les sources suspendues (APEC, Civiweb) ne sont jamais interrogées, même si ell
 | France Travail | Si vous visez la France ou aucun pays précis : `candidat.francetravail.fr`, ou l'API officielle si vous avez fourni des identifiants (voir 4.3) | oui |
 | Talent.com | Le site de chaque pays visé : `fr.talent.com`, `be.talent.com`, `ch.talent.com`, `lu.talent.com`, `ca.talent.com`, `www.talent.com` (États-Unis), `ma.talent.com`, `tn.talent.com` ou `sn.talent.com`. `fr.talent.com` si vous n'indiquez aucun pays. Aucun site Talent.com n'est contacté si aucun de vos pays n'est dans cette liste | non : à activer vous-même |
 | LinkedIn | `www.linkedin.com`, pages publiques, sans compte | non : à cocher vous-même, puis le moteur doit être installé |
-| Posts LinkedIn (via Google) | `www.googleapis.com` (API Google Programmable Search) : vos intitulés de poste et votre clé API y sont envoyés ; LinkedIn n'est jamais contacté | non : à activer vous-même, après avoir saisi votre clé |
+| Posts LinkedIn (via Google) | `serpapi.com` (ou l'adresse de `SERPAPI_URL`) : vos intitulés de poste et votre clé API y sont envoyés ; SerpAPI interroge Google pour vous ; LinkedIn n'est jamais contacté | non : à activer vous-même, après avoir saisi votre clé |
 | APEC | aucun : source suspendue depuis la 3.4.13, le site bloquant les requêtes automatiques | non : suspendue |
 | Civiweb (V.I.E) | aucun : source suspendue, Business France exigeant désormais une authentification | non : suspendue |
 
