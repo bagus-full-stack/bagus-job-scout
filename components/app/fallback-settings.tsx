@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { PROVIDERS, type ProviderId } from "@/lib/ai/providers";
+import { LLM_CHANGED } from "@/lib/ai/events";
 
 type State = {
   active: ProviderId;
@@ -26,13 +27,19 @@ export function FallbackSettings() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
-    fetch("/api/settings/llm/fallbacks")
-      .then((r) => r.json())
-      .then((s: State) => {
-        setState(s);
-        setOrder(s.order);
-      })
-      .catch(() => setMsg({ ok: false, text: "Réglages de secours illisibles." }));
+    const load = () =>
+      fetch("/api/settings/llm/fallbacks", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((s: State) => {
+          setState(s);
+          // Le fournisseur actif ne peut pas être son propre secours (il l'était peut-être avant d'être choisi).
+          setOrder(s.order.filter((id) => id !== s.active));
+        })
+        .catch(() => setMsg({ ok: false, text: "Réglages de secours illisibles." }));
+    load();
+    // « Génération IA » enregistre un fournisseur : la liste des secours possibles change aussitôt.
+    window.addEventListener(LLM_CHANGED, load);
+    return () => window.removeEventListener(LLM_CHANGED, load);
   }, []);
 
   if (!state) return null;

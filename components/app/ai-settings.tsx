@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { PROVIDERS, PROVIDER_IDS, noLocalModelMessage, type ProviderId } from "@/lib/ai/providers";
+import { LLM_CHANGED } from "@/lib/ai/events";
 
 type Quota = {
   points_remaining: number | null;
@@ -154,6 +155,7 @@ export function AiSettings({
         setInfo(mode === "pack" ? "Relais activé ✓" : `${preset.label} activé ✓`);
       }
       await refresh();
+      window.dispatchEvent(new Event(LLM_CHANGED));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur réseau");
     } finally {
