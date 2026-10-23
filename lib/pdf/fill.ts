@@ -34,7 +34,7 @@ async function freeSpace(cv: GeneratedCV, lang: DocLang): Promise<number> {
  * Tant que la page n'est pas remplie, redemande à l'IA d'ajouter des éléments
  * pertinents du profil (3 tours au plus), puis ajuste la police sur une page.
  * Un complément qui déborde, échoue ou n'ajoute rien est abandonné : le CV
- * précédent reste valide.
+ * précédent reste valide (un tour perdu, puis nouvel essai).
  */
 export async function fitAndFillCV(
   cv: GeneratedCV,
@@ -42,6 +42,7 @@ export async function fitAndFillCV(
 ): Promise<{ pdf: Buffer; cv: GeneratedCV; fontSize: number }> {
   let current = cv;
   let free = await freeSpace(current, ctx.lang);
+  console.log(`[fillCV] place libre ${Math.round(free)} pt`);
   for (let round = 0; round < MAX_ROUNDS && free >= MIN_FREE; round++) {
     let next: GeneratedCV;
     try {
@@ -53,11 +54,19 @@ export async function fitAndFillCV(
       console.error("[fillCV] complément IA ignoré :", e);
       break;
     }
-    if ((await pagesAt(next, ctx.lang, CV_FONT_SIZES[0])) > 1) break;
+    // Complément qui déborde ou qui n'ajoute rien : on garde l'ancien CV et on redemande.
+    if ((await pagesAt(next, ctx.lang, CV_FONT_SIZES[0])) > 1) {
+      console.log(`[fillCV] tour ${round + 1} : complément trop long, ignoré`);
+      continue;
+    }
     const nextFree = await freeSpace(next, ctx.lang);
-    if (nextFree > free - 6) break; // rien d'ajouté
+    if (nextFree > free - 6) {
+      console.log(`[fillCV] tour ${round + 1} : rien d'ajouté (${Math.round(nextFree)} pt libres), ignoré`);
+      continue;
+    }
     current = next;
     free = nextFree;
+    console.log(`[fillCV] tour ${round + 1} : place libre ${Math.round(free)} pt`);
   }
   return fitCVToOnePage(current, ctx.lang);
 }

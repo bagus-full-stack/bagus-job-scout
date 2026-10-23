@@ -34,6 +34,8 @@ export type GeneratedCV = {
     }[];
     educations: {
       school: string;
+      /** Repris du profil par generateCV (le modèle ne le fournit pas). */
+      location?: string | null;
       degree: string | null;
       field: string | null;
       start_date: string | null;
@@ -200,7 +202,7 @@ export async function generateCV(
 
 ## Offre cible\n- Titre: ${offre.title}\n- Entreprise: ${offre.company}\n- Pays: ${offre.country ?? ""}\n- Description:\n${offre.description_text.slice(0, 6000)}\n\nGénère le CV optimisé${lang === "en" ? " — entièrement en anglais" : ""}.${
       fill
-        ? `\n\n## CV actuel à compléter\n${JSON.stringify(fill.current)}\n\nLa page n'est pas pleine : il reste environ ${fill.freeLines} lignes vides. Renvoie le CV COMPLET en recopiant À L'IDENTIQUE tout l'existant (profil, intitulés, puces, chiffres et noms propres compris : ne reformule, ne raccourcis et ne supprime rien) et en y AJOUTANT uniquement, tirés UNIQUEMENT du profil, des éléments pertinents pour l'offre : puces supplémentaires d'expériences (jusqu'à 4 par poste), un projet de plus (3 au plus), une puce de formation, compétences manquantes, et de NOUVELLES SECTIONS de compétences si le profil les justifie et qu'elles manquent (obligatoire : « IA appliquée » dès que le profil a au moins 3 compétences d'IA/data ; sinon « Data & ML », « Cloud », « Tests & qualité »). N'ajoute pas plus de ${fill.freeLines} lignes.`
+        ? `\n\n## CV actuel à compléter\n${JSON.stringify(fill.current)}\n\nLa page n'est pas pleine : il reste environ ${fill.freeLines} lignes vides. Renvoie le CV COMPLET en recopiant À L'IDENTIQUE tout l'existant (profil, intitulés, puces, chiffres et noms propres compris : ne reformule, ne raccourcis et ne supprime rien) et en y AJOUTANT uniquement, tirés UNIQUEMENT du profil, des éléments pertinents pour l'offre : puces supplémentaires d'expériences (jusqu'à 4 par poste), un projet de plus (3 au plus), une puce de formation, compétences manquantes, et de NOUVELLES SECTIONS de compétences si le profil les justifie et qu'elles manquent (obligatoire : « IA appliquée » dès que le profil a au moins 3 compétences d'IA/data ; sinon « Data & ML », « Cloud », « Tests & qualité »). Tu DOIS ajouter au moins ${Math.max(2, Math.floor(fill.freeLines / 2))} lignes de contenu nouveau (un CV renvoyé identique est refusé), sans dépasser ${fill.freeLines} lignes.`
         : ""
     }`,
   });
@@ -233,7 +235,7 @@ export async function generateCV(
     .filter((g) => g.items.length > 0);
   // Relecture (orthographe, accords, typographie, faits non étayés) — jamais bloquante.
   return proofreadCV(
-    enforceAtsLimits({ ...validated, sections: { ...validated.sections, skill_groups } }),
+    enforceAtsLimits({ ...validated, sections: { ...validated.sections, skill_groups } }, profile),
     profile,
     lang
   );
@@ -246,16 +248,18 @@ export async function generateCV(
  * - Max 3 educations
  * - Summary trimmed to ~55 words
  */
-function enforceAtsLimits(cv: GeneratedCV): GeneratedCV {
+function enforceAtsLimits(cv: GeneratedCV, profile: ProfileFull): GeneratedCV {
   const sortedExp = [...cv.sections.experiences].sort(compareRecentFirst);
   const experiences = sortedExp.slice(0, 4).map((e) => ({
     ...e,
     bullet_points: (e.bullet_points ?? []).slice(0, 4),
   }));
-  const educations = [...cv.sections.educations].sort(compareRecentFirst).slice(0, 3).map((e) => ({
-    ...e,
-    bullet_points: (e.bullet_points ?? []).slice(0, 2),
-  }));
+  // Formation sans puces (elles répétaient le diplôme) ; le lieu vient du profil.
+  const norm = (v: string) => v.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const educations = [...cv.sections.educations].sort(compareRecentFirst).slice(0, 3).map((e) => {
+    const known = profile.educations.find((k) => norm(k.school).includes(norm(e.school)) || norm(e.school).includes(norm(k.school)));
+    return { ...e, location: known?.location ?? null, bullet_points: [] };
+  });
 
   let summary = cv.summary ?? "";
   const words = summary.split(/\s+/);

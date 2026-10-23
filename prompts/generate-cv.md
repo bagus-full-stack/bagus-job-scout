@@ -21,9 +21,9 @@ Nom du projet — Rôle                           | AAAA - Aujourd'hui
 • …
 
 FORMATION
-École                                          | AAAA - AAAA
-Diplôme — Spécialité
-• Détail / projets
+Diplôme : Spécialité                            | MM/AAAA - MM/AAAA
+École (le lieu est ajouté automatiquement)
+(aucune puce)
 
 COMPÉTENCES ET LANGUES
 Langages : Java, Python, …
@@ -41,12 +41,12 @@ Langues : Français (Natif) | Anglais (B2) | …
 4. **Zéro invention — règle absolue** : chaque puce reformule une puce ou une description **existante** du profil. N'ajoute **aucune** activité, responsabilité, outil, chiffre, résultat ou périmètre absent du profil (ex. : budget, négociation, prospection, cahier des charges, reporting, management d'équipe, pourcentage). Si le profil ne le dit pas, le CV ne le dit pas. Langues : uniquement celles de `profile.languages`, avec leur niveau exact.
 4bis. **`headline`** : titre court (2 à 5 mots) sous le nom, calqué sur l'intitulé de l'offre MAIS vrai pour le profil (ex. offre « Développeur Full Stack Java H/F » → « Ingénieur Full Stack Java » ; profil Full Stack + IA et offre IA → « Ingénieur IA & Full Stack »). Pas de « H/F », pas de séniorité que le parcours ne porte pas, pas de nom d'entreprise.
 5. **PROFIL** : 3-5 phrases naturelles. Pas de formule figée du type « Candidat motivé pour le poste de… » : termine par une phrase d'accroche qui relie ton parcours au poste visé. Cite l'intitulé du poste **sans** ses marques de genre (« F/H », « (H/F) », « H/F/X ») et en corrigeant un éventuel accord évident.
-6. **Dates** : expériences en `MM/AAAA - MM/AAAA` (poste en cours : `MM/AAAA - Aujourd'hui`) ; formations en années `AAAA - AAAA`. Reprends exactement les dates du profil ; si un mois est inconnu, ne l'invente pas (utilise l'année seule).
+6. **Dates** : expériences en `MM/AAAA - MM/AAAA` (poste en cours : `MM/AAAA - Aujourd'hui`) ; formations en `MM/AAAA - MM/AAAA` (année seule si le mois est inconnu). Reprends exactement les dates du profil ; si un mois est inconnu, ne l'invente pas (utilise l'année seule).
 7. **Mots-clés de l'offre** intégrés naturellement dans PROFIL, expériences et compétences (densité 2-3 %), uniquement quand le profil les couvre réellement.
 8. **`skill_groups`** : compétences ORGANISÉES PAR SECTION, 4 à 8 sections (ex. « Langages », « Frontend », « Backend & API », « Bases de données », « DevOps & qualité », « IA appliquée », « Méthodes »), libellés courts adaptés au métier du candidat et à l'offre (un profil non technique : « Gestion de projet », « Outils », « Analyse »…). 3 à 10 compétences par section, 20 à 40 au total, la plus pertinente pour l'offre en premier dans chaque section, sections les plus pertinentes d'abord. **Obligatoire : un profil qui couvre plusieurs domaines (ex. Full Stack ET IA) a une section par domaine, même si l'offre n'en cible qu'un (le domaine secondaire vient après, il reste visible) : dès que le profil contient au moins 3 compétences d'IA/data (LLM, RAG, embeddings, LangChain, PyTorch, YOLO, OpenCV, Pandas, prompt engineering…), la section « IA appliquée » est présente.** « IA appliquée » (LLM, RAG, prompt engineering, tool calling, embeddings, LangChain…), « Data & ML » (Pandas, fine-tuning, modèles…) en plus des sections développement. Crée toute section justifiée par le profil, jamais de compétence absente du profil. Aucune compétence dans deux sections, sans doublons ni quasi-doublons (« gestion de projet » ET « pilotage de projets » = doublon), sans soft skills creuses, en priorisant celles qui matchent l'offre ET sont ancrées dans une expérience (`anchored: true`).
 9. **`languages`** : nom + niveau exact du profil (Natif, C2, B2, courant…). Une certification se met dans le niveau : « B2 (TOEIC 850) ».
 10. **Outils et plateformes par expérience** : une puce ne cite que les outils/plateformes présents dans les `skills_used` ou les puces de CETTE expérience — jamais ceux d'une autre (Salesforce ≠ un poste en logistique ; Figma ≠ un projet associatif si le profil ne le dit pas). Un chiffre (clients, volumes, équipes) reste attaché à l'expérience et au périmètre exacts du profil.
-11. **Formations** en ordre anti-chronologique (la plus récente en premier), libellés repris du profil.
+11. **Formations** en ordre anti-chronologique (la plus récente en premier), libellés repris du profil (`degree`, `field`, `school` tels quels). **Aucune puce** (`bullet_points` vide) : le diplôme et l'école suffisent, rien à répéter.
 12. **Accroche bornée au réel** : les années d'expérience annoncées correspondent à la durée totale des postes ; n'écris pas « X ans d'expérience en [spécialité] » si un seul poste couvre cette spécialité ; pas de posture de séniorité que le parcours ne porte pas.
 13. **Orthographe, grammaire, typographie** : relis-toi. Accords en genre et en nombre, accents (y compris sur les majuscules : « Étude »), espace insécable avant « : », « ; », « ! », « ? ». Pas d'emoji, pas d'icône, pas de symbole exotique, pas d'anglicisme inutile.
 

@@ -7,7 +7,6 @@ import {
   formatLanguage,
   displayUrl,
   capitalizeFirst,
-  eduYearRange,
   expDateRange,
   cleanJobTitle,
 } from "@/lib/text/typography";
@@ -142,31 +141,18 @@ export async function renderCVDocx(cv: GeneratedCV, language: DocLang = "fr", fo
   if (cv.sections.educations.length) {
     children.push(sectionTitle(L.education));
     for (const e of cv.sections.educations) {
-      children.push(
-        new Paragraph({
-          spacing: { before: 80, after: 20 },
-          children: [
-            new TextRun({ text: e.school, bold: true, size: SZ_BODY + 1, font: FONT }),
-            new TextRun({
-              text: `  |  ${eduYearRange(e.start_date, e.end_date, language)}`,
-              italics: true,
-              size: SZ_BODY,
-              color: "3a3a3c",
-              font: FONT,
-            }),
-          ],
-        })
-      );
-      const degreeLine = [e.degree, e.field].filter(Boolean).join(" — ");
-      if (degreeLine) {
+      const title = [e.degree, e.field].filter(Boolean).join(" : ") || e.school;
+      children.push(headerLine(ty(title), expDateRange(e.start_date, e.end_date, language)));
+      if (e.degree || e.field) {
         children.push(
           new Paragraph({
-            spacing: { after: 30 },
-            children: [new TextRun({ text: ty(degreeLine), italics: true, size: SZ_BODY, font: FONT })],
+            spacing: { after: 40 },
+            children: [
+              new TextRun({ text: [e.school, e.location].filter(Boolean).join(", "), italics: true, size: SZ_BODY, font: FONT }),
+            ],
           })
         );
       }
-      children.push(...bulletParagraphs(e.bullet_points ?? [], ty, 20));
     }
   }
 

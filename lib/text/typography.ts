@@ -102,7 +102,8 @@ export function expDate(d: string | null | undefined, lang: DocLang = "fr"): str
   if (!d) return "";
   const v = d.trim();
   if (ONGOING_RE.test(v)) return LABELS[lang].ongoing;
-  const m = v.match(/^(\d{4})-(\d{2})$/);
+  // 2024-03 ou 2024-03-01 (le modèle renvoie parfois la date complète) → 03/2024
+  const m = v.match(/^(\d{4})-(\d{2})(?:-\d{2})?$/);
   if (m) return `${m[2]}/${m[1]}`;
   return v;
 }
@@ -110,6 +111,6 @@ export function expDate(d: string | null | undefined, lang: DocLang = "fr"): str
 export function expDateRange(start?: string | null, end?: string | null, lang: DocLang = "fr"): string {
   const s = expDate(start, lang);
   const e = expDate(end, lang);
-  if (s && e) return `${s} - ${e}`;
+  if (s && e) return s === e ? s : `${s} - ${e}`;
   return s || e || "";
 }

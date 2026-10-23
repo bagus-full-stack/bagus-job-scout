@@ -7,7 +7,6 @@ import {
   formatLanguage,
   displayUrl,
   capitalizeFirst,
-  eduYearRange,
   expDateRange,
   cleanJobTitle,
 } from "@/lib/text/typography";
@@ -195,11 +194,14 @@ export function CVDocument({
             <Text style={cvStyles.sectionTitle}>{L.education}</Text>
             {cv.sections.educations.map((e, i) => (
               <View key={i} style={cvStyles.eduBlock} wrap={false}>
-                <HeaderRow st={cvStyles} title={e.school} tail={eduYearRange(e.start_date, e.end_date, language)} />
+                <HeaderRow
+                  st={cvStyles}
+                  title={ty([e.degree, e.field].filter(Boolean).join(" : ") || e.school)}
+                  tail={expDateRange(e.start_date, e.end_date, language)}
+                />
                 {(e.degree || e.field) && (
-                  <Text style={cvStyles.eduDegree}>{ty([e.degree, e.field].filter(Boolean).join(" — "))}</Text>
+                  <Text style={cvStyles.eduDegree}>{[e.school, e.location].filter(Boolean).join(", ")}</Text>
                 )}
-                <Bullets items={e.bullet_points ?? []} ty={ty} st={cvStyles} />
               </View>
             ))}
           </>
