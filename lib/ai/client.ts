@@ -1,6 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import { getSetting } from "@/lib/db";
+import { getSetting, setSetting } from "@/lib/db";
 import { PROVIDERS, isProviderId, normalizeBaseURLInput, type ProviderId, type ProviderKind } from "./providers";
 
 /**
@@ -41,6 +41,10 @@ export const LLM_SETTING_KEYS = {
   /** Clé Anthropic (nom historique, conservé : les installations ≤ 3.4.10 continuent de fonctionner). */
   byokKey: "llm:byok_key",
   provider: "llm:provider",
+  /** Fournisseurs de secours, dans l'ordre d'essai : JSON ["gemini", "openai"]. */
+  fallbacks: "llm:fallbacks",
+  /** Dernière bascule : JSON { from, to, reason, at }. */
+  lastFallback: "llm:last_fallback",
 } as const;
 
 /** Clé API d'un fournisseur (Anthropic garde son nom historique). */
@@ -145,6 +149,53 @@ export function providerBaseUrl(p: ProviderId): string {
 export function currentProvider(): ProviderId {
   const p = clean(getSetting(LLM_SETTING_KEYS.provider));
   return isProviderId(p) ? p : "anthropic";
+}
+
+/** Configuration « clé personnelle » d'un fournisseur donné, ou null s'il n'est pas prêt (clé ou modèles absents). */
+export function byokConfigFor(provider: ProviderId): LlmConfig | null {
+  const preset = PROVIDERS[provider];
+  const apiKey = clean(getSetting(providerKeySetting(provider)));
+  const baseURL = providerBaseUrl(provider);
+  const models = providerModels(provider);
+  const ready = (apiKey || !preset.keyRequired) && baseURL && models.writer && models.reviewer;
+  return ready ? { mode: "byok", provider, kind: preset.kind, apiKey, baseURL, models, source: "settings" } : null;
+}
+
+/** Fournisseurs de secours enregistrés, dans l'ordre d'essai (sans doublon, identifiants connus seulement). */
+export function fallbackOrder(): ProviderId[] {
+  try {
+    const raw = JSON.parse(getSetting(LLM_SETTING_KEYS.fallbacks) ?? "[]");
+    return Array.isArray(raw) ? [...new Set(raw.filter(isProviderId))] : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Configurations de secours prêtes à servir derrière `primary` (jamais en mode relais : un seul serveur). */
+export function fallbackConfigs(primary: LlmConfig): LlmConfig[] {
+  if (primary.mode !== "byok") return [];
+  return fallbackOrder()
+    .filter((p) => p !== primary.provider)
+    .map(byokConfigFor)
+    .filter((c): c is LlmConfig => c !== null);
+}
+
+export type LastFallback = { from: ProviderId; to: ProviderId; reason: string; at: string };
+
+export function getLastFallback(): LastFallback | null {
+  try {
+    const v = JSON.parse(getSetting(LLM_SETTING_KEYS.lastFallback) ?? "null");
+    return v && isProviderId(v.from) && isProviderId(v.to) ? (v as LastFallback) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Mémorise une bascule (au plus une écriture par paire et par tranche de 10 min : un lot ne réécrit pas la base à chaque appel). */
+export function recordFallback(from: ProviderId, to: ProviderId, reason: string) {
+  const last = getLastFallback();
+  if (last && last.from === from && last.to === to && Date.now() - Date.parse(last.at) < 600_000) return;
+  setSetting(LLM_SETTING_KEYS.lastFallback, JSON.stringify({ from, to, reason, at: new Date().toISOString() }));
 }
 
 /**

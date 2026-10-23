@@ -1,6 +1,14 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
-import { getClaude, getLlmConfig, LlmNotConfiguredError, type LlmConfig, type LlmRole } from "./client";
+import {
+  fallbackConfigs,
+  getClaude,
+  getLlmConfig,
+  LlmNotConfiguredError,
+  recordFallback,
+  type LlmConfig,
+  type LlmRole,
+} from "./client";
 import { PROVIDERS, type ProviderId } from "./providers";
 import { isTimeoutError, networkCode, providerFetch } from "./http";
 import { coerceToSchema, extractJsonObject, parseToolArguments } from "./json-extract";
@@ -122,11 +130,77 @@ export type LlmDeps = {
 const blocksOf = (system: string | SystemBlock[]): SystemBlock[] =>
   typeof system === "string" ? [{ text: system, cache: false }] : system;
 
+/* ------------------------- Bascule entre fournisseurs ------------------------- */
+
+const FAILOVER_STATUS = new Set([401, 402, 403, 408, 429, 500, 502, 503, 504, 529]);
+const FAILOVER_MESSAGE = /credit balance|insufficient|quota|billing|rate.?limit|overloaded|resource.?exhausted|unavailable|capacity/i;
+/** Un fournisseur écarté après un échec n'est pas réessayé pendant ce délai : un lot ne paie pas un délai par appel. */
+export const COOLDOWN_MS = 5 * 60_000;
+
+// Cache partagé entre les copies du module dupliquées par le build standalone (comme le client Anthropic).
+const GL = globalThis as typeof globalThis & { __jobscoutLlmCooldown?: Map<string, number> };
+const cooldowns = () => (GL.__jobscoutLlmCooldown ??= new Map<string, number>());
+export function resetCooldowns() {
+  cooldowns().clear();
+}
+
+/**
+ * L'échec vient-il du fournisseur (injoignable, quota, crédit, surcharge, clé refusée) ? Alors un autre
+ * peut répondre. Une réponse mal formée ou une demande refusée (400) ne justifie pas de payer un 2e appel.
+ */
+export function failoverReason(e: unknown): string | null {
+  if (e instanceof LlmNotConfiguredError) return null;
+  if (e instanceof LlmTransportError) return e.timeout ? "délai dépassé" : "injoignable";
+  const err = e as { status?: unknown; name?: unknown; message?: unknown } | null;
+  const status = typeof err?.status === "number" ? err.status : null;
+  const msg = typeof err?.message === "string" ? err.message : "";
+  if (/credit balance|insufficient|billing/i.test(msg)) return "crédit épuisé";
+  if (status === 429 || /quota|rate.?limit|resource.?exhausted/i.test(msg)) return "quota dépassé";
+  if (status === 401 || status === 403) return "clé refusée";
+  if (status !== null && FAILOVER_STATUS.has(status)) return `indisponible (HTTP ${status})`;
+  if (err?.name === "APIConnectionError" || err?.name === "APIConnectionTimeoutError") return "injoignable";
+  if (status === null && FAILOVER_MESSAGE.test(msg)) return "indisponible";
+  return null;
+}
+
+/**
+ * Appel structuré avec bascule : le fournisseur actif d'abord, puis les fournisseurs de secours dans l'ordre
+ * enregistré (Profil › Génération IA). Une configuration passée explicitement (tests, vérifications) ne bascule jamais.
+ */
 export async function callStructured(
   req: StructuredRequest,
-  cfg: LlmConfig = getLlmConfig(),
+  cfg?: LlmConfig,
   deps: LlmDeps = {}
 ): Promise<StructuredResult> {
+  if (cfg) return callOne(req, cfg, deps);
+  const primary = getLlmConfig();
+  if (primary.mode === "unset") throw new LlmNotConfiguredError();
+  const chain = [primary, ...fallbackConfigs(primary)];
+  const now = Date.now();
+  const live = chain.filter((c) => (cooldowns().get(c.provider) ?? 0) <= now);
+  const order = live.length ? live : chain; // tous écartés : on retente tout le monde plutôt que d'échouer d'office
+  let reason: string | null = null;
+  for (let i = 0; i < order.length; i++) {
+    const c = order[i];
+    try {
+      const r = await callOne(req, c, deps);
+      if (c.provider !== primary.provider) {
+        console.warn(`[llm] ${primary.provider} → ${c.provider} (${reason ?? "écarté après un échec récent"})`);
+        recordFallback(primary.provider, c.provider, reason ?? "écarté après un échec récent");
+      }
+      return r;
+    } catch (e) {
+      const why = failoverReason(e);
+      if (!why || i === order.length - 1) throw e;
+      reason = why;
+      cooldowns().set(c.provider, Date.now() + COOLDOWN_MS);
+      console.warn(`[llm] ${c.provider} ${why} — essai du fournisseur suivant`);
+    }
+  }
+  throw new LlmNotConfiguredError(); // inatteignable : la chaîne contient au moins le fournisseur actif
+}
+
+async function callOne(req: StructuredRequest, cfg: LlmConfig, deps: LlmDeps): Promise<StructuredResult> {
   if (cfg.mode === "unset") throw new LlmNotConfiguredError();
   const model = cfg.models[req.role];
   if (cfg.kind === "anthropic") return callAnthropic(req, cfg, model, deps);
