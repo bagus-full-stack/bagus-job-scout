@@ -453,6 +453,13 @@ function SearchCard({
 // Experiences
 // ============================================================
 
+// Skills of a deleted experience/project go too, unless a remaining one still uses them.
+function skillsAfterDelete(profile: ProfileFull, removed: string[] | undefined, experiences: Experience[], projects: Project[]) {
+  const gone = new Set((removed ?? []).map((s) => s.toLowerCase()));
+  for (const used of [...experiences, ...projects].flatMap((x) => x.skills_used ?? [])) gone.delete(used.toLowerCase());
+  return profile.skills.filter((s) => !gone.has(s.name.toLowerCase()));
+}
+
 function ExperiencesCard({
   profile,
   update,
@@ -481,7 +488,11 @@ function ExperiencesCard({
   }
   function remove(i: number) {
     if (!confirm("Supprimer cette expérience ?")) return;
-    update({ experiences: profile.experiences.filter((_, j) => j !== i) });
+    const experiences = profile.experiences.filter((_, j) => j !== i);
+    update({
+      experiences,
+      skills: skillsAfterDelete(profile, profile.experiences[i].skills_used, experiences, profile.projects ?? []),
+    });
     setOpenIdx((prev) => {
       const next = new Set<number>();
       for (const idx of prev) {
@@ -915,7 +926,8 @@ function ProjectsCard({
   };
   function remove(i: number) {
     if (!confirm("Supprimer ce projet ?")) return;
-    update({ projects: projects.filter((_, j) => j !== i) });
+    const rest = projects.filter((_, j) => j !== i);
+    update({ projects: rest, skills: skillsAfterDelete(profile, projects[i].skills_used, profile.experiences, rest) });
     setOpenIdx(new Set());
   }
   function add() {
