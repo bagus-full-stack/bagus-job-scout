@@ -197,7 +197,7 @@ export function OffresList({
           </label>
           <label className="glass-inset flex min-w-[170px] items-center gap-2 rounded-[14px] px-3 text-small text-textSecondary">
             <span>Trier par</span>
-            <select value={sortBy} onChange={(event) => { setSortBy(event.target.value as OffersSort); setPage(1); }} className="h-12 min-w-0 flex-1 bg-transparent font-semibold text-text focus:outline-none" aria-label="Trier les offres">
+            <select value={sortBy} onChange={(event) => { setSortBy(event.target.value as OffersSort); setPage(1); }} className="h-12 min-w-0 flex-1 bg-transparent font-semibold text-text focus:outline-none [&>option]:bg-bg [&>option]:text-text" aria-label="Trier les offres">
               <option value="smart">Pertinence</option>
               <option value="newest">Plus récentes</option>
               <option value="oldest">Plus anciennes</option>
