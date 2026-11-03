@@ -140,6 +140,12 @@ Coût : avec Claude (Anthropic), environ 0,12 à 0,20 $ par dossier (CV + lettre
 
 **Qualité selon le modèle** : les garde-fous anti-invention (validation contre le profil, limites de mise en page) s'appliquent quel que soit le modèle. Mais JobScout a été mis au point avec Claude : avec un autre modèle, relisez vos premiers documents. Si un modèle renvoie une réponse mal formée, JobScout tente un repli (mode JSON, extraction tolérante) avant d'afficher une erreur qui invite à choisir un modèle plus capable.
 
+## Suivi des offres et des candidatures
+- **Coller une offre** : bouton *Coller une offre* sur la page *Offres*. Le texte (et un lien facultatif) est analysé par l'IA (titre, entreprise, pays, lieu, contrat, `lib/ai/extract-offre.ts`), l'offre rejoint la base avec la source `manual`, puis CV, lettre et candidature fonctionnent comme pour une offre scannée.
+- **Contrôle de vivacité** : la fiche d'une offre vérifie que l'annonce d'origine répond encore (`app/api/offres/[id]/alive`) et affiche un bandeau si elle est clôturée (404/410 ou mention « poste pourvu », « job expired »…). Simple requête HTTP, sans navigateur : les pages en JavaScript ou qui bloquent les robots ne sont pas détectées.
+- **Relances** : le tableau de bord liste les candidatures « envoyées » sans réponse depuis plus de 10 jours (`FOLLOW_UP_DAYS`). Calcul à l'affichage, aucune notification.
+- **Réussite par source** : la page *Candidatures* affiche, par source, le nombre de candidatures et la part qui mène à un entretien ou une acceptation (peu significatif sous une vingtaine de candidatures par source).
+
 ## Candidatures par e-mail et spontanées
 - **Envoi par e-mail** depuis la fiche d'une offre : CV et lettre en PDF joints, message prérempli, candidature enregistrée comme « envoyée ». SMTP à renseigner une fois pour tous les envois, dans Profil › Messagerie (hôte, port, utilisateur, mot de passe d'application) ; l'adresse de candidature est cherchée dans l'annonce (`lib/mail/contact.ts`).
 - **Candidatures spontanées** : page *Spontanées*, import d'un fichier Excel ou CSV d'entreprises et d'adresses (`lib/mail/contacts-file.ts`, `lib/excel/contacts.ts`), liste paginée (25 par page).
