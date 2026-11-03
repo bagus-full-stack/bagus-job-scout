@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowUpRight, CalendarDays, Check, ChevronDown, Download, FileSpreadsheet, Search, StickyNote, Trash2, Upload, UserRound } from "lucide-react";
+import { ArrowUpRight, CalendarDays, Check, ChevronDown, Download, FileSpreadsheet, MailWarning, Search, StickyNote, Trash2, Upload, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ const STATUS_OPTIONS: { id: string; label: string; variant: BadgeVariant }[] = [
   { id: "entretien", label: "Entretien", variant: "warning" },
   { id: "acceptee", label: "Acceptée", variant: "success" },
   { id: "refusee", label: "Refusée", variant: "danger" },
+  { id: "echec", label: "Échec", variant: "danger" },
 ];
 
 const STAGES = [
@@ -82,6 +83,7 @@ export function CandidaturesTable({ initial }: { initial: Row[] }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [importing, setImporting] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -216,6 +218,26 @@ export function CandidaturesTable({ initial }: { initial: Row[] }) {
     }
   }
 
+  // Lit les mails de retour (adresse introuvable) et passe les candidatures concernées en « Échec ».
+  async function checkBounces() {
+    setError(null);
+    setNotice(null);
+    setChecking(true);
+    try {
+      const res = await fetch("/api/candidatures/bounces", { method: "POST" });
+      const result = await res.json().catch(() => ({})) as { updated?: number; found?: number; error?: string };
+      if (!res.ok) throw new Error(result.error ?? "Lecture de la boîte impossible.");
+      const fresh = await fetch("/api/candidatures").then((response) => response.json());
+      if (Array.isArray(fresh.candidatures)) setRows(fresh.candidatures);
+      setNotice(result.updated ? `${result.updated} candidature${result.updated > 1 ? "s passées" : " passée"} en échec (adresse introuvable).` : "Aucun retour de mail à signaler.");
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Erreur réseau.");
+    } finally {
+      setChecking(false);
+    }
+  }
+
   const editorFor = (row: Row, layout: "card" | "row") => (
     <CandidatureEditor
       row={row}
@@ -251,6 +273,7 @@ export function CandidaturesTable({ initial }: { initial: Row[] }) {
         <div className="flex flex-wrap gap-2 sm:ml-auto">
           <input ref={fileInput} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file); }} />
           <Button variant="secondary" onClick={() => fileInput.current?.click()} disabled={importing}><Upload className="h-4 w-4" /> {importing ? "Import…" : "Importer"}</Button>
+          <Button variant="secondary" onClick={() => void checkBounces()} disabled={checking}><MailWarning className="h-4 w-4" /> {checking ? "Lecture…" : "Vérifier les retours"}</Button>
           <Button variant="secondary" asChild><a href="/api/candidatures/export" download><Download className="h-4 w-4" /> Exporter</a></Button>
         </div>
       </section>

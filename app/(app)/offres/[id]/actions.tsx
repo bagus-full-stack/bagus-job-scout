@@ -23,6 +23,7 @@ const STATUS_LABELS: Record<string, string> = {
   entretien: "Entretien",
   acceptee: "Acceptée",
   refusee: "Refusée",
+  echec: "Échec",
 };
 
 // Les messages d'erreur IA renvoient à « Profil › Génération IA » : on y mène d'un clic.

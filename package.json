@@ -28,6 +28,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "docx": "^9.0.2",
+    "imapflow": "^2.10.0",
     "isomorphic-dompurify": "^2.16.0",
     "jsdom": "^28.1.0",
     "lucide-react": "^0.460.0",

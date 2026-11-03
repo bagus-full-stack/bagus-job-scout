@@ -28,7 +28,7 @@ export type CandidatureWithOffre = CandidatureRow & {
   offre_score: number | null;
 };
 
-export const STATUS = ["envoyee", "en_cours", "entretien", "refusee", "acceptee"] as const;
+export const STATUS = ["envoyee", "en_cours", "entretien", "refusee", "acceptee", "echec"] as const;
 export type Status = (typeof STATUS)[number];
 
 export function listCandidatures(): CandidatureWithOffre[] {

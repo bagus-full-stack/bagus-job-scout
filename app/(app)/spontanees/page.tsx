@@ -19,6 +19,7 @@ const STATUS_LABELS: Record<string, string> = {
   entretien: "Entretien",
   acceptee: "Acceptée",
   refusee: "Refusée",
+  echec: "Échec",
 };
 
 const PAGE_SIZE = 25;
