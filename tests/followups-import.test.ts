@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getDb } from "@/lib/db";
 import { createCandidature, followUps, importCandidatures, successBySource, FOLLOW_UP_DAYS } from "@/lib/db/candidatures";
 import { normDate } from "@/lib/excel/io";
-import { followUpDraft } from "@/lib/mail/draft";
+import { followUpDraft, mailDraft } from "@/lib/mail/draft";
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
 
@@ -64,5 +64,30 @@ describe("followUpDraft", () => {
   it("followUps rend le contact et le pays pour choisir destinataire et langue", () => {
     createCandidature({ offre_id: null, ext_company: "Contactée", ext_title: "Dev", ext_country: "Royaume-Uni", contact: "rh@contactee.fr", applied_at: daysAgo(FOLLOW_UP_DAYS + 5) });
     expect(followUps(20).find((f) => f.company === "Contactée")).toMatchObject({ contact: "rh@contactee.fr", country: "Royaume-Uni" });
+  });
+});
+
+describe("mail de candidature spontanée", () => {
+  const args = { title: "Chef de projet", company: "Acme", fullName: "Sami B.", phone: "06 00 00 00 00", email: "s@x.fr" };
+  const profile = { summary: "Chef de projet digital, 6 ans d'expérience en agence. Pilote des refontes web de bout en bout. Aime les équipes petites.", location: "Lyon", portfolio_url: "https://bagus-full-stack.me/", preferred_contracts: ["cdi", "cdd"] };
+
+  it("présente le candidat, ce qu'il cherche et où le joindre", () => {
+    const { body } = mailDraft({ ...args, lang: "fr", spontaneous: true, profile });
+    expect(body).toContain("Mon profil : Chef de projet digital, 6 ans d'expérience en agence. Pilote des refontes web de bout en bout.");
+    expect(body).not.toContain("Aime les équipes"); // deux phrases au plus
+    expect(body).toContain("Je recherche un poste de Chef de projet (CDI ou CDD).");
+    expect(body.endsWith("Sami B.\n06 00 00 00 00 | s@x.fr | Lyon\nPortfolio : https://bagus-full-stack.me/")).toBe(true);
+    expect(mailDraft({ ...args, lang: "en", spontaneous: true, profile }).body).toContain("About me:");
+  });
+
+  it("sans résumé ni contrats, le message reste valable", () => {
+    const { body } = mailDraft({ ...args, lang: "fr", spontaneous: true, profile: { summary: null, preferred_contracts: [] } });
+    expect(body).not.toContain("Mon profil");
+    expect(body).not.toContain("Portfolio");
+    expect(body).toContain("Je recherche un poste de Chef de projet.");
+  });
+
+  it("une candidature sur offre garde son message court", () => {
+    expect(mailDraft({ ...args, lang: "fr", profile }).body).not.toContain("Mon profil");
   });
 });

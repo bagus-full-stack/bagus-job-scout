@@ -116,6 +116,7 @@ async function applyOne(item: AutoItem): Promise<void> {
       phone: profile.phone,
       email: profile.email,
       spontaneous: item.kind === "spontanees",
+      profile,
     });
     await sendMail({
       to: item.email,

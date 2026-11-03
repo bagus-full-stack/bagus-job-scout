@@ -40,6 +40,7 @@ export default async function OffreDetailPage({ params }: { params: Promise<{ id
     phone: profile?.phone,
     email: profile?.email,
     spontaneous: offre.source === "spontanee",
+    profile,
   });
   const mail = { to: findApplyEmail(offre.description_text) ?? "", ...draft };
   const score = scoreColor(offre.score ?? 0);
