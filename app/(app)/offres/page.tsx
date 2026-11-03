@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { OffresList } from "./list";
 import { ScanButton } from "./scan-button";
 import { PurgeButton } from "./purge-button";
+import { PasteButton } from "./paste-button";
 import { AutoPanel } from "@/components/app/auto-panel";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ export default async function OffresPage({ searchParams }: { searchParams: Promi
         eyebrow="Découvrir"
         title="Vos prochaines opportunités"
         subtitle={subtitle}
-        actions={<div className="flex gap-2"><PurgeButton /><ScanButton /></div>}
+        actions={<div className="flex gap-2"><PasteButton /><PurgeButton /><ScanButton /></div>}
       />
       <AutoPanel kind="offres" />
       <OffresList initialResult={initial} initialVieOnly={vieOnly} initialMinScore={minScore} homeSuggestion={homeSuggestion} />
