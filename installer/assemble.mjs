@@ -204,7 +204,7 @@ export async function assemble({
   const staticDir = path.join(PROJECT, ".next", "static");
   if (!fs.existsSync(standalone)) {
     throw new Error(
-      "`.next/standalone` absent — lancez `npx next build` (output: 'standalone')."
+      "`.next/standalone` absent — lancez `JOBSCOUT_STANDALONE=1 npx next build`."
     );
   }
 

@@ -194,7 +194,7 @@ async function main() {
     execFileSync(process.execPath, [nextBin, "build"], {
       cwd: PROJECT,
       stdio: "inherit",
-      env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" }, // pas de télémétrie Next (README, « Confidentialité »)
+      env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", JOBSCOUT_STANDALONE: "1" }, // pas de télémétrie Next (README, « Confidentialité ») ; sortie autonome pour le paquet
     });
   } else {
     log("build Next réutilisé (--no-next-build)");

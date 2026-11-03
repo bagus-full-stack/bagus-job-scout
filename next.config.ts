@@ -4,8 +4,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   devIndicators: false,
   // Sortie autonome : .next/standalone contient server.js + le strict nécessaire
-  // de node_modules. C'est la base du paquet Windows (installer/).
-  output: "standalone",
+  // de node_modules. C'est la base du paquet Windows (installer/build.mjs la demande
+  // avec JOBSCOUT_STANDALONE=1). Sans elle, `npm start` et Docker utilisent `next start`,
+  // que Next.js déconseille avec « output: standalone ».
+  ...(process.env.JOBSCOUT_STANDALONE ? { output: "standalone" as const } : {}),
   // Racine de traçage explicite : sans elle Next remonte au dossier parent
   // (par exemple un dossier de travail contenant plusieurs projets) pour deviner
   // un monorepo, ce qui produit une arborescence
