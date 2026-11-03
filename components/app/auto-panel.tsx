@@ -47,6 +47,9 @@ export function AutoPanel({ kind }: { kind: Kind }) {
 
   useEffect(() => {
     load();
+    // Un lot lancé ailleurs sur la page (bouton « Réessayer » d'un contact) : on le relit tout de suite.
+    window.addEventListener("jobscout:auto-started", load);
+    return () => window.removeEventListener("jobscout:auto-started", load);
   }, [load]);
 
   // Un seul lot à la fois : s'il est d'un autre type, ce panneau l'indique sans l'afficher.

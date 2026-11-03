@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { listSpontaneous } from "@/lib/db/spontanees";
 import { ImportContacts } from "../offres/import-contacts";
 import { DeleteContact } from "./delete-contact";
+import { RetryContact } from "./retry-contact";
+import { SENT_PREFIX } from "@/lib/auto/apply";
 import { RoleEditor, BulkRole } from "./role-editor";
 import { getProfile } from "@/lib/db/queries";
 import { VerifyButton } from "./verify-button";
@@ -90,6 +92,7 @@ export default async function SpontaneesPage({ searchParams }: { searchParams: P
               >
                 {c.has_cv && c.has_lm ? "Envoyer" : "Préparer"} <ArrowUpRight className="h-3.5 w-3.5" />
               </Link>
+              {!c.status && c.auto_error && !c.auto_error.startsWith(SENT_PREFIX) && <RetryContact id={c.id} label={c.company} />}
               <DeleteContact id={c.id} label={c.company} />
             </li>
           ))}

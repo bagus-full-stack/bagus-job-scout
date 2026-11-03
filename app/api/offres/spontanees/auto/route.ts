@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => null);
   const kind = kindOf(b?.kind);
   const minScore = scoreOf(b?.minScore);
-  const r = startAuto(kind, Number(b?.count), minScore);
+  const ids = Array.isArray(b?.ids) ? b.ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0) : undefined;
+  const r = startAuto(kind, ids ? ids.length : Number(b?.count), minScore, undefined, ids);
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
   return NextResponse.json(state(kind, minScore));
 }

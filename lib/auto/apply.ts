@@ -206,14 +206,16 @@ export async function runAuto(job: AutoJob, deps: Deps = realDeps): Promise<void
 
 export type StartResult = { ok: true; job: AutoJob } | { ok: false; error: string };
 
-export function startAuto(kind: AutoKind, count: number, minScore = AUTO_MIN_SCORE, deps?: Deps): StartResult {
+/** `onlyIds` : ne traiter que ces cibles (bouton « Réessayer » d'un contact), si elles sont éligibles. */
+export function startAuto(kind: AutoKind, count: number, minScore = AUTO_MIN_SCORE, deps?: Deps, onlyIds?: number[]): StartResult {
   if (getAutoJob()?.running) return { ok: false, error: "Un lot est déjà en cours." };
   if (!getMailConfig()) return { ok: false, error: "Messagerie non configurée : renseignez-la dans Profil › Messagerie." };
   if (!getProfile()) return { ok: false, error: "Profil introuvable." };
   const n = Math.floor(count);
   if (!(n >= 1 && n <= AUTO_MAX)) return { ok: false, error: `Choisissez entre 1 et ${AUTO_MAX} candidatures.` };
-  const pool: Omit<AutoItem, "kind" | "state">[] =
+  const eligible: Omit<AutoItem, "kind" | "state">[] =
     kind === "offres" ? eligibleOffres(Math.max(0, Math.min(100, Math.floor(minScore) || 0))) : eligibleContacts();
+  const pool = onlyIds ? eligible.filter((c) => onlyIds.includes(c.id)) : eligible;
   const items: AutoItem[] = pool.slice(0, n).map((c) => ({ id: c.id, kind, company: c.company, title: c.title, email: c.email, state: "waiting" }));
   if (!items.length)
     return {

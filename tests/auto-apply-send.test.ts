@@ -80,4 +80,15 @@ describe("lot automatique : jamais deux mails pour la même offre", () => {
     expect(claimSend(id)).toBe(true);
     releaseSend(id);
   });
+
+  it("onlyIds : un lot n'envoie qu'à la cible demandée (bouton Réessayer)", async () => {
+    const first = addOffre();
+    addOffre(); // plus récente : sans filtre, c'est elle qui passerait d'abord
+    const r = startAuto("offres", 1, 70, undefined, [first]);
+    expect(r.ok).toBe(true);
+    await vi.waitFor(() => expect(getAutoJob()?.running).toBe(false));
+    expect(getAutoJob()!.items.map((i) => i.id)).toEqual([first]);
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    expect(startAuto("offres", 1, 70, undefined, [999999]).ok).toBe(false); // cible inéligible ou inconnue
+  });
 });
