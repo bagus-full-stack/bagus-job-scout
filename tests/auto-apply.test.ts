@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { runAuto, type AutoItem, type AutoJob } from "@/lib/auto/apply";
+import { SENT_PREFIX, SentError, eligibleContacts, runAuto, type AutoItem, type AutoJob } from "@/lib/auto/apply";
+
+const contact = (id: number, over: Record<string, unknown> = {}) => ({ id, company: `C${id}`, email: `rh${id}@acme.test`, status: null, dns: "ok", auto_error: null, ...over });
+const listed = vi.hoisted(() => ({ rows: [] as unknown[] }));
+vi.mock("@/lib/db/spontanees", async (orig) => ({ ...(await orig<typeof import("@/lib/db/spontanees")>()), listSpontaneous: () => listed.rows }));
 
 const job = (n: number): AutoJob => ({
   kind: "spontanees",
@@ -85,5 +89,19 @@ describe("lot de candidatures automatiques", () => {
     expect(j.items.map((i) => i.state)).toEqual(["sent", "waiting", "waiting", "waiting"]);
     expect(j.stopReason).toBe("Arrêté à votre demande.");
     expect(j.running).toBe(false);
+  });
+
+  it("mail parti mais candidature non enregistrée : le lot s'arrête et la cible n'est plus jamais proposée", async () => {
+    const j = job(3);
+    const { deps, recorded } = mk(async (i) => {
+      if (i.id === 1) throw new SentError(`${SENT_PREFIX}, mais candidature non enregistrée (base verrouillée) : ajoutez-la à la main.`);
+    });
+    await runAuto(j, deps);
+    expect(j.items.map((i) => i.state)).toEqual(["failed", "waiting", "waiting"]);
+    expect(recorded).toHaveLength(1);
+    expect(j.stopReason).toContain("Lot interrompu");
+
+    listed.rows = [contact(1, { auto_error: recorded[0][1] }), contact(2, { auto_error: "boîte pleine" }), contact(3)];
+    expect(eligibleContacts().map((c) => c.id)).toEqual([2, 3]); // un échec ordinaire se retente, pas un mail déjà parti
   });
 });

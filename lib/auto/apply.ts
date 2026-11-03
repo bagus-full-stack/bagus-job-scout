@@ -47,9 +47,12 @@ export type AutoJob = {
 const g = globalThis as { __jobscoutAuto?: AutoJob };
 export const getAutoJob = (): AutoJob | null => g.__jobscoutAuto ?? null;
 
-/** Contacts qu'on peut candidater : adresse valide, domaine qui reçoit du courrier, aucune candidature encore. */
+/** Début du message noté sur une cible dont le mail est parti sans que la candidature soit enregistrée : on ne la renvoie jamais. */
+export const SENT_PREFIX = "Mail envoyé";
+
+/** Contacts qu'on peut candidater : adresse valide, domaine qui reçoit du courrier, aucune candidature encore, mail pas déjà parti. */
 export function eligibleContacts() {
-  return listSpontaneous().filter((c) => !c.status && c.dns !== "invalid" && isEmail(c.email));
+  return listSpontaneous().filter((c) => !c.status && c.dns !== "invalid" && isEmail(c.email) && !c.auto_error?.startsWith(SENT_PREFIX));
 }
 
 /**
@@ -75,6 +78,8 @@ export function eligibleOffres(minScore: number): { id: number; company: string;
 }
 
 class SkipError extends Error {}
+/** Le mail est parti mais la base n'a pas suivi : le lot s'arrête, la cible n'est plus éligible. */
+export class SentError extends Error {}
 
 /** Prépare et envoie la candidature d'un contact. Lève une erreur au message lisible en cas d'échec. */
 async function applyOne(item: AutoItem): Promise<void> {
@@ -126,7 +131,7 @@ async function applyOne(item: AutoItem): Promise<void> {
       const id = createCandidature({ offre_id: item.id, cv_doc_id: cv.id, lm_doc_id: lm.id, status: "envoyee", contact: item.email });
       updateCandidature(id, { status: "envoyee", contact: item.email });
     } catch (e) {
-      throw new Error(`Mail envoyé, mais candidature non enregistrée (${e instanceof Error ? e.message : "erreur base"}) : ajoutez-la à la main.`);
+      throw new SentError(`${SENT_PREFIX}, mais candidature non enregistrée (${e instanceof Error ? e.message : "erreur base"}) : ajoutez-la à la main.`);
     }
   } finally {
     releaseSend(item.id);
@@ -177,6 +182,10 @@ export async function runAuto(job: AutoJob, deps: Deps = realDeps): Promise<void
         item.state = "failed";
         item.error = message;
         deps.record(item.id, message);
+        if (e instanceof SentError) {
+          job.stopReason = `${message} Lot interrompu.`;
+          break;
+        }
         fails++;
         if ((e as { code?: string }).code === "EAUTH") {
           job.stopReason = "La messagerie refuse l'identifiant : vérifiez le serveur SMTP et le mot de passe d'application.";
