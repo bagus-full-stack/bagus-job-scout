@@ -4,7 +4,8 @@ import { SPONTANEOUS_SOURCE } from "@/lib/mail/contacts-file";
 
 export const runtime = "nodejs";
 
-// Supprime les offres sans candidature ni document ; les contacts spontanés restent.
+// Supprime les offres sans candidature ni document ; les contacts spontanés et les offres collées à la main
+// (leur texte n'existe nulle part ailleurs) restent.
 // Filtres facultatifs : days (offres de plus de N jours), source.
 export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => ({}));
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
   const source = typeof b?.source === "string" && b.source ? b.source : null;
   const { changes } = getDb()
     .prepare(
-      `DELETE FROM offres WHERE source != ?
+      `DELETE FROM offres WHERE source NOT IN (?, 'manual')
          AND NOT EXISTS(SELECT 1 FROM candidatures WHERE offre_id = offres.id)
          AND NOT EXISTS(SELECT 1 FROM documents WHERE offre_id = offres.id)
          AND (? IS NULL OR julianday(COALESCE(posted_at, scraped_at)) < julianday('now', '-' || ? || ' days'))

@@ -74,7 +74,6 @@ function localGuard(req: NextRequest): NextResponse {
 async function hostedGuard(req: NextRequest): Promise<NextResponse> {
   const path = req.nextUrl.pathname;
   const isApi = path.startsWith("/api/");
-  if (path === "/api/health") return NextResponse.next();
   if (!accessPassword()) {
     return new NextResponse("Version hébergée sans mot de passe : définissez JOBSCOUT_ACCESS_PASSWORD.", { status: 503 });
   }
@@ -82,6 +81,8 @@ async function hostedGuard(req: NextRequest): Promise<NextResponse> {
   if (!sessionSecret()) {
     return new NextResponse("Version hébergée sans secret de session : définissez JOBSCOUT_SESSION_SECRET (une longue chaîne aléatoire).", { status: 503 });
   }
+  // La sonde passe après ces contrôles : un serveur mal configuré doit se voir « malade », pas « sain ».
+  if (path === "/api/health") return NextResponse.next();
 
   const method = req.method.toUpperCase();
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";

@@ -162,7 +162,7 @@ Optionnel. `JOBSCOUT_HOSTED=1` protège tout le site (pages et API) par un mot d
 
 - Serveur limité à `127.0.0.1` ; l'API refuse les requêtes venant d'un autre site ou d'un hôte non local (`middleware.ts`)
 - Version hébergée : mot de passe d'accès, session signée (`HttpOnly`, 7 jours), 5 essais par 15 minutes, actions réservées au poste local désactivées
-- Clés IA stockées en clair dans la base locale, jamais renvoyées au navigateur (seuls les 4 derniers caractères sont affichés)
+- Clés IA et mot de passe SMTP chiffrés (AES-256-GCM, clé dans `secret.key` à côté de la base) dans la base locale, jamais renvoyées au navigateur (seuls les 4 derniers caractères sont affichés)
 - Aucune télémétrie : JobScout n'envoie rien à son éditeur, et les scripts de lancement (`npm run dev`, `npm run build`) coupent celle de Next.js (`scripts/next.mjs`)
 - Whitelist de colonnes sur la mise à jour des candidatures (anti mass-assignment)
 - Bornage des chemins d'écriture du dossier documents ; ouverture de dossier restreinte au dossier configuré

@@ -12,7 +12,9 @@ import {
   providerModels,
   providerModelsSetting,
   proxyBaseUrl,
+  readProviderKey,
   resetClaude,
+  saveProviderKey,
   type LlmConfig,
 } from "@/lib/ai/client";
 import { listModels } from "@/lib/ai/llm";
@@ -157,7 +159,7 @@ function byokDraft(body: Record<string, unknown>, requireWriter = true): ByokDra
   const provider: ProviderId = providerRaw;
   const preset = PROVIDERS[provider];
 
-  const apiKey = clean(body.key) ?? clean(body.byok_key) ?? clean(getSetting(providerKeySetting(provider)));
+  const apiKey = clean(body.key) ?? clean(body.byok_key) ?? readProviderKey(provider);
   if (preset.keyRequired && !apiKey) return { ok: false, error: `Saisissez votre clé API ${preset.label}.` };
   // Espace insécable, caractère invisible ou apostrophe typographique collés avec la clé :
   // l'en-tête serait refusé avant tout envoi, et l'erreur passait pour une panne réseau.
@@ -267,7 +269,7 @@ export async function POST(req: NextRequest) {
   if (action === "save") {
     setSetting(LLM_SETTING_KEYS.mode, "byok");
     setSetting(LLM_SETTING_KEYS.provider, cfg.provider);
-    if (cfg.apiKey) setSetting(providerKeySetting(cfg.provider), cfg.apiKey);
+    if (cfg.apiKey) saveProviderKey(cfg.provider, cfg.apiKey);
     if (PROVIDERS[cfg.provider].editableBaseURL) setSetting(providerBaseUrlSetting(cfg.provider), cfg.baseURL);
     setSetting(providerModelsSetting(cfg.provider), JSON.stringify(cfg.models));
     resetClaude(); // best-effort — l'empreinte relue à chaque appel fait le vrai travail

@@ -16,8 +16,7 @@ export function isPrivateHost(hostname: string): boolean {
     h === "localhost" ||
     h.endsWith(".local") ||
     h.endsWith(".internal") ||
-    h === "::1" ||
-    /^(fc|fd|fe80)/.test(h) ||
+    h.includes(":") || // adresse IPv6 brute (::1, ::ffff:7f00:1…) : aucune annonce réelle n'en utilise
     /^(0|10|127)\./.test(h) ||
     /^169\.254\./.test(h) ||
     /^192\.168\./.test(h) ||

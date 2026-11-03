@@ -41,16 +41,17 @@ describe("safeNext", () => {
 });
 
 describe("middleware hébergé", () => {
-  it("sans mot de passe configuré, rien n'est servi (503), sauf la sonde de santé", async () => {
+  it("sans mot de passe configuré, rien n'est servi (503), sonde de santé comprise", async () => {
     delete process.env.JOBSCOUT_ACCESS_PASSWORD;
     expect((await middleware(req("/offres"))).status).toBe(503);
-    expect((await middleware(req("/api/health"))).headers.get("x-middleware-next")).toBe("1");
+    expect((await middleware(req("/api/health"))).status).toBe(503);
   });
 
   it("sans secret de session, rien n'est servi (503) : le mot de passe ne signe jamais les sessions", async () => {
     const token = await createSessionToken();
     delete process.env.JOBSCOUT_SESSION_SECRET;
     expect((await middleware(req("/offres"))).status).toBe(503);
+    expect((await middleware(req("/api/health"))).status).toBe(503);
     expect(await verifySessionToken(token)).toBe(false);
   });
 

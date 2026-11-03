@@ -131,7 +131,7 @@ export function parseSearchPage(html: string, domain: Domain): Card[] {
 async function fetchSearchPage(domain: Domain, keywords: string, page: number): Promise<Card[]> {
   const params = new URLSearchParams({ k: keywords, l: "" });
   if (page > 1) params.set("p", String(page));
-  const res = await fetch(`https://${domain.host}/jobs?${params}`, { headers: BROWSER_HEADERS });
+  const res = await fetch(`https://${domain.host}/jobs?${params}`, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(30_000) });
   if (!res.ok) throw new Error(`Talent.com ${domain.host} HTTP ${res.status}`);
   return parseSearchPage(await res.text(), domain);
 }
@@ -141,7 +141,7 @@ export async function enrich(card: Card): Promise<ScrapedOffre> {
   let ldCompany: string | null = null;
   let ldPosted: string | null = null;
   try {
-    const res = await fetch(card.url, { headers: BROWSER_HEADERS });
+    const res = await fetch(card.url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(30_000) });
     if (res.ok) {
       const doc = parseDocument(await res.text());
       const ld = extractJobPostingLd(doc);

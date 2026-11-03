@@ -35,4 +35,11 @@ describe("coller une offre", () => {
     expect(o.description_html).not.toContain("<b>");
     expect(o.score).toBeGreaterThan(0);
   });
+
+  it("la purge garde l'offre collée, même sans candidature ni document", async () => {
+    const { id } = await (await post({ text: "Développeur web <i>H/F</i>\n\nCréation d'applications React et Node pour une agence parisienne, CDI." })).json();
+    const { POST: purge } = await import("@/app/api/offres/purge/route");
+    await purge(new NextRequest("http://localhost/api/offres/purge", { method: "POST", body: "{}" }));
+    expect(getOffre(id)).not.toBeNull();
+  });
 });

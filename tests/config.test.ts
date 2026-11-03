@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { setSetting } from "@/lib/db";
+import { getSetting, setSetting } from "@/lib/db";
 import {
   LLM_SETTING_KEYS,
   MODELS,
+  readProviderKey,
+  saveProviderKey,
   getLlmConfig,
   getLlmState,
   providerBaseUrlSetting,
@@ -53,6 +55,14 @@ describe("configuration IA", () => {
       baseURL: "https://api.openai.com/v1",
       models: { writer: "gpt-x", reviewer: "gpt-x-mini" },
     });
+  });
+
+  it("clé enregistrée chiffrée dans la base, relue en clair", () => {
+    saveProviderKey("openai", "sk-test-openai-9999");
+    const stored = getSetting(providerKeySetting("openai"))!;
+    expect(stored.startsWith("enc:v1:")).toBe(true);
+    expect(stored).not.toContain("sk-test");
+    expect(readProviderKey("openai")).toBe("sk-test-openai-9999");
   });
 
   it("clé obligatoire absente → non configuré", () => {

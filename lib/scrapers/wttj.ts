@@ -154,6 +154,7 @@ async function searchPage(query: string, page: number): Promise<{ hits: Hit[]; n
       origin: SITE,
     },
     body: JSON.stringify({ requests: [{ indexName: INDEX, params: params.toString() }] }),
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) throw new Error(`WTTJ Algolia HTTP ${res.status}`);
   const data = (await res.json()) as { results?: { hits?: Hit[]; nbPages?: number }[]; message?: string };

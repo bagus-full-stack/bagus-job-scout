@@ -180,6 +180,7 @@ async function fetchPage(skip: number, limit: number): Promise<CiviwebOffer[]> {
     method: "POST",
     headers: HEADERS,
     body: JSON.stringify({ skip, limit }),
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = (await res.json()) as { result: CiviwebOffer[]; count: number };

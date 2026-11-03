@@ -68,4 +68,5 @@ jobs:
             curl -fsS "https://${{ vars.DEPLOY_DOMAIN }}/api/health" && exit 0
             sleep 5
           done
+          echo "::error::Le site ne répond pas sur la nouvelle version. Retour arrière : JOBSCOUT_TAG=<SHA de la version précédente> dans le .env du serveur, puis docker compose up -d."
           exit 1

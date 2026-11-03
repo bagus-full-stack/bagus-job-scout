@@ -49,6 +49,7 @@ async function getToken(): Promise<string | null> {
         client_secret: secret,
         scope: "api_offresdemploiv2 o2dsoffre",
       }),
+      signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -129,6 +130,7 @@ async function fetchApi(keywords: string, start: number, size: number, contracts
   if (ftTypes.length && ftTypes.length === contracts.length) params.set("typeContrat", ftTypes.join(","));
   const res = await fetch(`${API_BASE}/offres/search?${params}`, {
     headers: { accept: "application/json", authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) return [];
   const data = await res.json();
@@ -188,7 +190,7 @@ async function fetchHtmlPage(keywords: string, page: number): Promise<HtmlCard[]
     offresPartenaires: "true",
     page: String(page),
   });
-  const res = await fetch(`${SEARCH_PAGE}?${params}`, { headers: BROWSER_HEADERS });
+  const res = await fetch(`${SEARCH_PAGE}?${params}`, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(30_000) });
   if (!res.ok) throw new Error(`France Travail HTTP ${res.status}`);
   return parseHtmlSearch(await res.text());
 }
@@ -197,7 +199,7 @@ export async function enrichCard(card: HtmlCard): Promise<ScrapedOffre> {
   const url = `https://candidat.francetravail.fr/offres/recherche/detail/${card.id}`;
   let descHtml: string | null = null;
   try {
-    const res = await fetch(url, { headers: BROWSER_HEADERS });
+    const res = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(30_000) });
     if (res.ok) {
       const doc = parseDocument(await res.text());
       const ld = extractJobPostingLd(doc);

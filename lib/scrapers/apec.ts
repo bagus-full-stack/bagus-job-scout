@@ -85,6 +85,7 @@ async function searchPage(keywords: string, start: number, size: number): Promis
     method: "POST",
     headers: API_HEADERS,
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) throw new Error(`APEC HTTP ${res.status}`);
   const data = await res.json();
@@ -93,7 +94,7 @@ async function searchPage(keywords: string, start: number, size: number): Promis
 
 async function fetchDetailHtml(url: string): Promise<string | null> {
   try {
-    const res = await fetch(url, { headers: DETAIL_HEADERS });
+    const res = await fetch(url, { headers: DETAIL_HEADERS, signal: AbortSignal.timeout(30_000) });
     if (!res.ok) return null;
     const doc = parseDocument(await res.text());
     return firstMatchHtml(doc, DETAIL_SELECTORS, 300) ?? largestTextBlockHtml(doc, 300);

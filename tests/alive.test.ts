@@ -23,7 +23,7 @@ describe("isClosedPage", () => {
 
 describe("isPrivateHost", () => {
   it("refuse le réseau local et les métadonnées du cloud, accepte un site public", () => {
-    for (const h of ["localhost", "127.0.0.1", "10.0.0.5", "192.168.1.2", "172.16.0.1", "172.31.9.9", "169.254.169.254", "[::1]", "nas.local"]) expect(isPrivateHost(h), h).toBe(true);
-    for (const h of ["www.welcometothejungle.com", "172.32.0.1", "example.org"]) expect(isPrivateHost(h), h).toBe(false);
+    for (const h of ["localhost", "127.0.0.1", "10.0.0.5", "192.168.1.2", "172.16.0.1", "172.31.9.9", "169.254.169.254", "[::1]", "[::]", "[::ffff:7f00:1]", "nas.local"]) expect(isPrivateHost(h), h).toBe(true);
+    for (const h of ["www.welcometothejungle.com", "172.32.0.1", "example.org", "fdj.fr", "fcbarcelona.com"]) expect(isPrivateHost(h), h).toBe(false);
   });
 });

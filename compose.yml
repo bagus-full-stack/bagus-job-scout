@@ -1,7 +1,8 @@
 # Serveur : docker compose up -d   (variables dans le fichier .env voisin, voir « Hébergement en ligne » dans le README)
 services:
   jobscout:
-    image: ghcr.io/bagus-full-stack/bagus-job-scout:latest
+    # JOBSCOUT_TAG (dans .env) fige une version précise, un SHA de commit, pour revenir en arrière ; sinon la dernière.
+    image: ghcr.io/bagus-full-stack/bagus-job-scout:${JOBSCOUT_TAG:-latest}
     restart: unless-stopped
     environment:
       JOBSCOUT_ACCESS_PASSWORD: ${JOBSCOUT_ACCESS_PASSWORD:?définir JOBSCOUT_ACCESS_PASSWORD dans .env}

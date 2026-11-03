@@ -1,6 +1,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSetting, setSetting } from "@/lib/db";
+import { decryptSecret, encryptSecret } from "@/lib/mail/send";
 import { PROVIDERS, isProviderId, normalizeBaseURLInput, type ProviderId, type ProviderKind } from "./providers";
 
 /**
@@ -50,6 +51,12 @@ export const LLM_SETTING_KEYS = {
 /** Clé API d'un fournisseur (Anthropic garde son nom historique). */
 export const providerKeySetting = (p: ProviderId): string =>
   p === "anthropic" ? LLM_SETTING_KEYS.byokKey : `llm:key:${p}`;
+/** Clé en clair d'un fournisseur. Elle est stockée chiffrée comme le mot de passe SMTP ; une ancienne valeur sans préfixe est rendue telle quelle. */
+export const readProviderKey = (p: ProviderId): string | null => {
+  const v = clean(getSetting(providerKeySetting(p)));
+  return v && decryptSecret(v);
+};
+export const saveProviderKey = (p: ProviderId, key: string): void => setSetting(providerKeySetting(p), encryptSecret(key));
 /** URL de base choisie pour un fournisseur à adresse modifiable (Ollama, LM Studio, Autre). */
 export const providerBaseUrlSetting = (p: ProviderId): string => `llm:base_url:${p}`;
 /** Modèles choisis pour un fournisseur : JSON { writer, reviewer }. */
@@ -154,7 +161,7 @@ export function currentProvider(): ProviderId {
 /** Configuration « clé personnelle » d'un fournisseur donné, ou null s'il n'est pas prêt (clé ou modèles absents). */
 export function byokConfigFor(provider: ProviderId): LlmConfig | null {
   const preset = PROVIDERS[provider];
-  const apiKey = clean(getSetting(providerKeySetting(provider)));
+  const apiKey = readProviderKey(provider);
   const baseURL = providerBaseUrl(provider);
   const models = providerModels(provider);
   const ready = (apiKey || !preset.keyRequired) && baseURL && models.writer && models.reviewer;
@@ -221,7 +228,7 @@ export function getLlmConfig(): LlmConfig {
   if (mode === "byok") {
     const provider = currentProvider();
     const preset = PROVIDERS[provider];
-    const apiKey = clean(getSetting(providerKeySetting(provider)));
+    const apiKey = readProviderKey(provider);
     const baseURL = providerBaseUrl(provider);
     const models = providerModels(provider);
     const ready = (apiKey || !preset.keyRequired) && baseURL && models.writer && models.reviewer;
@@ -287,7 +294,7 @@ export function getLlmState(): LlmState {
   const providers = {} as Record<ProviderId, ProviderState>;
   for (const id of Object.keys(PROVIDERS) as ProviderId[]) {
     providers[id] = {
-      keyHint: hint(clean(getSetting(providerKeySetting(id)))),
+      keyHint: hint(readProviderKey(id)),
       baseURL: providerBaseUrl(id),
       models: providerModels(id),
     };

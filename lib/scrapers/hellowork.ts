@@ -92,7 +92,7 @@ function parseSearchPage(html: string): Card[] {
 async function fetchSearchPage(keywords: string, page: number): Promise<Card[]> {
   const params = new URLSearchParams({ k: keywords, l: "France" });
   if (page > 1) params.set("p", String(page));
-  const res = await fetch(`${SEARCH_URL}?${params}`, { headers: BROWSER_HEADERS });
+  const res = await fetch(`${SEARCH_URL}?${params}`, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(30_000) });
   if (!res.ok) throw new Error(`HelloWork HTTP ${res.status}`);
   return parseSearchPage(await res.text());
 }
@@ -104,7 +104,7 @@ async function fetchDetail(card: Card): Promise<ScrapedOffre> {
   let ldContract: string | null = null;
   let ldPosted: string | null = null;
   try {
-    const res = await fetch(card.url, { headers: BROWSER_HEADERS });
+    const res = await fetch(card.url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(30_000) });
     if (res.ok) {
       const doc = parseDocument(await res.text());
       // Stratégie 1 : JSON-LD JobPosting (propre, structuré)
