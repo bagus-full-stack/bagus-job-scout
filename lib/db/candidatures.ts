@@ -180,11 +180,11 @@ export function upcomingDeadlines(limit = 5): UpcomingDeadline[] {
 export const FOLLOW_UP_DAYS = 10;
 
 /** Candidatures envoyées depuis plus de FOLLOW_UP_DAYS jours et toujours sans réponse (calculé, rien n'est stocké). */
-export function followUps(limit = 5): UpcomingDeadline[] {
+export function followUps(limit = 5): (UpcomingDeadline & { contact: string | null; country: string | null })[] {
   ensureOffresRepaired();
   const rows = getDb()
     .prepare(
-      `SELECT c.id, c.offre_id, c.applied_at AS deadline, c.status,
+      `SELECT c.id, c.offre_id, c.applied_at AS deadline, c.status, c.contact, COALESCE(o.country, c.ext_country) AS country,
               COALESCE(NULLIF(TRIM(o.title), ''), NULLIF(TRIM(c.ext_title), '')) AS title,
               COALESCE(NULLIF(TRIM(o.company), ''), NULLIF(TRIM(c.ext_company), '')) AS company
        FROM candidatures c
@@ -193,7 +193,7 @@ export function followUps(limit = 5): UpcomingDeadline[] {
        ORDER BY c.applied_at ASC
        LIMIT ?`
     )
-    .all(Math.max(1, Math.min(20, Math.trunc(limit)))) as UpcomingDeadline[];
+    .all(Math.max(1, Math.min(20, Math.trunc(limit)))) as (UpcomingDeadline & { contact: string | null; country: string | null })[];
   return plainAll(rows);
 }
 

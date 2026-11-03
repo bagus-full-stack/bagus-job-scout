@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getDb } from "@/lib/db";
 import { createCandidature, followUps, importCandidatures, successBySource, FOLLOW_UP_DAYS } from "@/lib/db/candidatures";
 import { normDate } from "@/lib/excel/io";
+import { followUpDraft } from "@/lib/mail/draft";
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
 
@@ -47,5 +48,21 @@ describe("importCandidatures", () => {
     const bad = { ...row("Zeta"), status: "inconnu" as never, notes: Symbol("x") as never };
     expect(() => importCandidatures([row("Beta"), bad])).toThrow();
     expect(count()).toBe(before);
+  });
+});
+
+describe("followUpDraft", () => {
+  const base = { title: "Chef de projet", company: "Acme", fullName: "Sami B.", sentOn: "03/11/2026" };
+
+  it("rédige la relance dans la langue demandée, avec poste, entreprise et date d'envoi", () => {
+    const fr = followUpDraft({ ...base, lang: "fr" });
+    expect(fr.subject).toContain("Relance");
+    for (const s of ["Chef de projet", "Acme", "03/11/2026", "Sami B."]) expect(fr.body).toContain(s);
+    expect(followUpDraft({ ...base, lang: "en" }).body).toContain("following up");
+  });
+
+  it("followUps rend le contact et le pays pour choisir destinataire et langue", () => {
+    createCandidature({ offre_id: null, ext_company: "Contactée", ext_title: "Dev", ext_country: "Royaume-Uni", contact: "rh@contactee.fr", applied_at: daysAgo(FOLLOW_UP_DAYS + 5) });
+    expect(followUps(20).find((f) => f.company === "Contactée")).toMatchObject({ contact: "rh@contactee.fr", country: "Royaume-Uni" });
   });
 });

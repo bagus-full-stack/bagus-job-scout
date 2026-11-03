@@ -1,5 +1,19 @@
 import type { DocLang } from "@/lib/text/lang";
 
+/** Relance d'une candidature restée sans réponse : courte, sans reproche, sans accord de genre. */
+export function followUpDraft(args: { lang: DocLang; title: string; company: string; fullName: string; sentOn: string }) {
+  const { lang, title, company, fullName, sentOn } = args;
+  return lang === "en"
+    ? {
+        subject: `Follow-up – ${title} – ${fullName}`,
+        body: `Dear Hiring Manager,\n\nI am following up on my application for the ${title} position at ${company}, sent on ${sentOn}. My application remains current, and I would be glad to discuss it at your convenience.\n\nBest regards,\n${fullName}`,
+      }
+    : {
+        subject: `Relance – candidature ${title} – ${fullName}`,
+        body: `Madame, Monsieur,\n\nJe me permets de revenir vers vous au sujet de ma candidature au poste de ${title} au sein de ${company}, envoyée le ${sentOn}. Elle reste d'actualité, et je me tiens à votre disposition pour en échanger.\n\nCordialement,\n${fullName}`,
+      };
+}
+
 /** Mail d'accompagnement : court et factuel, le fond est dans la lettre jointe. */
 export function mailDraft(args: {
   lang: DocLang;

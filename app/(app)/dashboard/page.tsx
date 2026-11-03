@@ -7,6 +7,9 @@ import { listCandidatures, candidaturesCounts, upcomingDeadlines, followUps, FOL
 import { listDocuments } from "@/lib/db/documents";
 import { highScoreFigure, untrackedOffresCount, vieFigure } from "@/lib/db/dashboard";
 import { getProfile } from "@/lib/db/queries";
+import { isEmail } from "@/lib/mail/contact";
+import { followUpDraft } from "@/lib/mail/draft";
+import { detectDocLanguage } from "@/lib/text/lang";
 import { formatRelativeDate, scoreColor } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -195,6 +198,9 @@ export default async function DashboardPage() {
                       ? <Link href={`/offres/${d.offre_id}`} className="block line-clamp-2 text-small font-semibold leading-snug hover:text-accent">{d.title ?? "Poste non précisé"}</Link>
                       : <span className="block line-clamp-2 text-small font-semibold leading-snug">{d.title ?? "Poste non précisé"}</span>}
                     <span className="block truncate text-small text-textSecondary">{d.company ?? "Entreprise non précisée"} · envoyée le {displayDate(d.deadline)}</span>
+                    <a href={followUpMailto(d, profile?.full_name ?? "")} className="mt-1 inline-flex items-center gap-1 text-caption font-medium text-accent hover:underline">
+                      <Send className="h-3 w-3" /> Brouillon de relance
+                    </a>
                   </li>
                 ))}
               </ul>
@@ -247,6 +253,19 @@ export default async function DashboardPage() {
       </div>
     </div>
   );
+}
+
+// Ouvre la messagerie de l'utilisateur avec la relance prête ; le destinataire est le contact de la candidature s'il s'agit d'une adresse.
+function followUpMailto(d: ReturnType<typeof followUps>[number], fullName: string): string {
+  const draft = followUpDraft({
+    lang: detectDocLanguage(d.title, null, null, d.country),
+    title: d.title ?? "",
+    company: d.company ?? "votre entreprise",
+    fullName,
+    sentOn: displayDate(d.deadline),
+  });
+  const to = d.contact && isEmail(d.contact) ? d.contact.trim() : "";
+  return `mailto:${to}?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(draft.body)}`;
 }
 
 function displayDate(value: string | null | undefined): string {
