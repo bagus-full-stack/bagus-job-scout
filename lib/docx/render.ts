@@ -251,8 +251,8 @@ export async function renderLMDocx(args: {
 
   // Destinataire uniquement si l'entreprise est connue (jamais un pays seul).
   if (company) {
-    children.push(new Paragraph({ children: [body(company)] }));
-    if (companyLocation) children.push(new Paragraph({ spacing: { after: 240 }, children: [body(companyLocation)] }));
+    children.push(new Paragraph({ alignment: AlignmentType.RIGHT, children: [body(company)] }));
+    if (companyLocation) children.push(new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 240 }, children: [body(companyLocation)] }));
     else children.push(new Paragraph({ spacing: { after: 240 }, children: [] }));
   }
 

@@ -326,7 +326,7 @@ const lmStyles = StyleSheet.create({
   blockGap: { height: 8 },
   smallGap: { height: 4 },
   dateLine: { fontSize: 10.5, marginBottom: 8 },
-  recipient: { fontSize: 10.5, marginBottom: 8 },
+  recipient: { fontSize: 10.5, marginBottom: 8, textAlign: "right" },
   subject: { fontFamily: "Helvetica-Bold", fontSize: 10.5, marginBottom: 10 },
   salutation: { marginBottom: 8 },
   paragraph: { textAlign: "justify", marginBottom: 8 },
