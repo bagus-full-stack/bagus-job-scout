@@ -3,7 +3,7 @@ import { ArrowRight, ArrowUpRight, Briefcase, CalendarClock, CalendarDays, Clock
 import { ScoreOrbit } from "@/components/app/score-orbit";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { suggestedOffres, offresCounts } from "@/lib/db/offres";
-import { listCandidatures, candidaturesCounts, upcomingDeadlines } from "@/lib/db/candidatures";
+import { listCandidatures, candidaturesCounts, upcomingDeadlines, followUps, FOLLOW_UP_DAYS } from "@/lib/db/candidatures";
 import { listDocuments } from "@/lib/db/documents";
 import { highScoreFigure, untrackedOffresCount, vieFigure } from "@/lib/db/dashboard";
 import { getProfile } from "@/lib/db/queries";
@@ -34,6 +34,7 @@ export default async function DashboardPage() {
   const candidatures = listCandidatures();
   const candCounts = candidaturesCounts();
   const deadlines = upcomingDeadlines(5);
+  const toFollow = followUps(5);
   const documents = listDocuments();
   const untrackedCount = untrackedOffresCount();
   // D4 : carte V.I.E pour un profil qui en cherche (contrats recherchés : preferred_contracts
@@ -180,6 +181,25 @@ export default async function DashboardPage() {
               )}
             </div>
           </section>
+
+          {toFollow.length > 0 && (
+            <section aria-labelledby="followup-title" className="glass-panel overflow-hidden">
+              <div className="border-b border-border px-5 py-5">
+                <h2 id="followup-title" className="font-display text-[19px] font-medium">À relancer</h2>
+                <p className="mt-0.5 text-caption text-textSecondary">Sans réponse depuis plus de {FOLLOW_UP_DAYS} jours</p>
+              </div>
+              <ul className="space-y-3 p-5">
+                {toFollow.map((d) => (
+                  <li key={d.id} className="min-w-0">
+                    {d.offre_id
+                      ? <Link href={`/offres/${d.offre_id}`} className="block line-clamp-2 text-small font-semibold leading-snug hover:text-accent">{d.title ?? "Poste non précisé"}</Link>
+                      : <span className="block line-clamp-2 text-small font-semibold leading-snug">{d.title ?? "Poste non précisé"}</span>}
+                    <span className="block truncate text-small text-textSecondary">{d.company ?? "Entreprise non précisée"} · envoyée le {displayDate(d.deadline)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section aria-labelledby="activity-title" className="glass-panel overflow-hidden">
             <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-5">

@@ -175,3 +175,38 @@ export function upcomingDeadlines(limit = 5): UpcomingDeadline[] {
     .all(Math.max(1, Math.min(20, Math.trunc(limit)))) as UpcomingDeadline[];
   return plainAll(rows);
 }
+
+/** Jours sans réponse au-delà desquels une candidature « envoyée » mérite une relance. */
+export const FOLLOW_UP_DAYS = 10;
+
+/** Candidatures envoyées depuis plus de FOLLOW_UP_DAYS jours et toujours sans réponse (calculé, rien n'est stocké). */
+export function followUps(limit = 5): UpcomingDeadline[] {
+  ensureOffresRepaired();
+  const rows = getDb()
+    .prepare(
+      `SELECT c.id, c.offre_id, c.applied_at AS deadline, c.status,
+              COALESCE(NULLIF(TRIM(o.title), ''), NULLIF(TRIM(c.ext_title), '')) AS title,
+              COALESCE(NULLIF(TRIM(o.company), ''), NULLIF(TRIM(c.ext_company), '')) AS company
+       FROM candidatures c
+       LEFT JOIN offres o ON o.id = c.offre_id
+       WHERE c.status = 'envoyee' AND julianday(c.applied_at) <= julianday('now', '-${FOLLOW_UP_DAYS} days')
+       ORDER BY c.applied_at ASC
+       LIMIT ?`
+    )
+    .all(Math.max(1, Math.min(20, Math.trunc(limit)))) as UpcomingDeadline[];
+  return plainAll(rows);
+}
+
+export type SourceStat = { source: string; total: number; positive: number };
+
+/** Par source : candidatures suivies et celles qui ont mené à un entretien ou une acceptation. */
+export function successBySource(): SourceStat[] {
+  return getDb()
+    .prepare(
+      `SELECT COALESCE(o.source, 'import') AS source, COUNT(*) AS total,
+              SUM(c.status IN ('entretien', 'acceptee')) AS positive
+       FROM candidatures c LEFT JOIN offres o ON o.id = c.offre_id
+       GROUP BY 1 ORDER BY total DESC`
+    )
+    .all() as SourceStat[];
+}

@@ -8,6 +8,7 @@ import { getDb } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { DescriptionRenderer } from "@/components/app/description-renderer";
 import { ActionsPanel } from "./actions";
+import { AliveBanner } from "./alive-banner";
 import { getProfile } from "@/lib/db/queries";
 import { detectDocLanguage, sourceLanguageHint } from "@/lib/text/lang";
 import { findApplyEmail } from "@/lib/mail/contact";
@@ -53,6 +54,8 @@ export default async function OffreDetailPage({ params }: { params: Promise<{ id
       <Link href="/offres" className="mb-6 inline-flex items-center gap-2 text-small font-semibold text-textSecondary transition-colors hover:text-accent">
         <ArrowLeft className="h-4 w-4" /> Toutes les offres
       </Link>
+
+      <AliveBanner offreId={offre.id} />
 
       <header className="glass-panel focus-card mb-8 p-5 sm:mb-9 sm:p-7">
         <div className="flex items-start gap-4">
