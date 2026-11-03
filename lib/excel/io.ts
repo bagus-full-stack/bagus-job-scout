@@ -64,6 +64,19 @@ function coerceStatus(raw: string): Status {
   return STATUS.find((s) => s === v) ?? "envoyee";
 }
 
+/**
+ * Date de cellule → « AAAA-MM-JJ » (null si illisible). Excel donne un numéro de série, un fichier
+ * saisi à la main « 03/11/2026 » ; SQLite (relances, échéances) ne lit que le format ISO.
+ */
+export function normDate(v: unknown): string | null {
+  if (typeof v === "number" && v > 20000 && v < 80000) return new Date(Math.round((v - 25569) * 86_400_000)).toISOString().slice(0, 10);
+  const s = String(v ?? "").trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (iso) return iso[0];
+  const fr = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})/.exec(s);
+  return fr ? `${fr[3]}-${fr[2].padStart(2, "0")}-${fr[1].padStart(2, "0")}` : null;
+}
+
 export function xlsxToCandidatures(buffer: Buffer): {
   applied_at: string | null;
   ext_company: string | null;
@@ -104,12 +117,12 @@ export function xlsxToCandidatures(buffer: Buffer): {
     const urlK = k(["url", "lien", "link"]);
 
     return {
-      applied_at: dateK ? String(r[dateK]) || null : null,
+      applied_at: dateK ? normDate(r[dateK]) : null,
       ext_company: compK ? String(r[compK]) || null : null,
       ext_title: postK ? String(r[postK]) || null : null,
       ext_country: paysK ? String(r[paysK]) || null : null,
       ext_score: scoreK && r[scoreK] !== "" ? Number(r[scoreK]) : null,
-      deadline: dlK ? String(r[dlK]) || null : null,
+      deadline: dlK ? normDate(r[dlK]) : null,
       status: statK ? coerceStatus(String(r[statK])) : "envoyee",
       notes: notesK ? String(r[notesK]) || null : null,
       contact: contactK ? String(r[contactK]) || null : null,

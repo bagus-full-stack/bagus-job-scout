@@ -1,5 +1,5 @@
 import "server-only";
-import { getDb, plainAll } from "./index";
+import { getDb, plainAll, transaction } from "./index";
 import { ensureOffresRepaired } from "./repair-markup";
 
 export type CandidatureRow = {
@@ -209,4 +209,27 @@ export function successBySource(): SourceStat[] {
        GROUP BY 1 ORDER BY total DESC`
     )
     .all() as SourceStat[];
+}
+
+type ImportRow = Parameters<typeof createCandidature>[0];
+
+/**
+ * Importe des candidatures sans offre, en une transaction (un échec n'en laisse pas la moitié) et sans
+ * doubler celles déjà présentes : même entreprise, même poste et, si le fichier la donne, même date.
+ */
+export function importCandidatures(rows: ImportRow[]): number {
+  const exists = getDb().prepare(
+    `SELECT 1 FROM candidatures WHERE offre_id IS NULL AND ext_company IS ? AND ext_title IS ?
+       AND (? IS NULL OR substr(applied_at, 1, 10) = ?)`
+  );
+  return transaction(() => {
+    let imported = 0;
+    for (const r of rows) {
+      const date = r.applied_at?.slice(0, 10) ?? null;
+      if (exists.get(r.ext_company ?? null, r.ext_title ?? null, date, date)) continue;
+      createCandidature(r);
+      imported++;
+    }
+    return imported;
+  });
 }

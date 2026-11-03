@@ -20,15 +20,16 @@ export function getDb(): DatabaseSync {
   db.exec(schema);
 
   // Migrations additives (bases existantes) — no-op si la colonne existe déjà.
-  try {
-    db.exec(
-      `ALTER TABLE profile ADD COLUMN preferred_contracts TEXT NOT NULL DEFAULT '["cdi","cdd"]'`
-    );
-  } catch {}
-
-  try {
-    db.exec(`ALTER TABLE profile ADD COLUMN target_titles TEXT NOT NULL DEFAULT '[]'`);
-  } catch {}
+  // Seule « colonne déjà là » est attendue ; toute autre erreur (disque plein, base verrouillée) remonte.
+  const addColumn = (sql: string) => {
+    try {
+      db.exec(sql);
+    } catch (e) {
+      if (!/duplicate column name/i.test(String(e))) throw e;
+    }
+  };
+  addColumn(`ALTER TABLE profile ADD COLUMN preferred_contracts TEXT NOT NULL DEFAULT '["cdi","cdd"]'`);
+  addColumn(`ALTER TABLE profile ADD COLUMN target_titles TEXT NOT NULL DEFAULT '[]'`);
 
   _db = db;
   return db;

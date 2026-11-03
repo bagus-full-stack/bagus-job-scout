@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE, accessPassword, hostedEnabled, publicOrigin, verifySessionToken } from "@/lib/auth/session";
+import { SESSION_COOKIE, accessPassword, hostedEnabled, publicOrigin, sessionSecret, verifySessionToken } from "@/lib/auth/session";
 
 /**
  * Garde-fou de JobScout.
@@ -77,6 +77,10 @@ async function hostedGuard(req: NextRequest): Promise<NextResponse> {
   if (path === "/api/health") return NextResponse.next();
   if (!accessPassword()) {
     return new NextResponse("Version hébergée sans mot de passe : définissez JOBSCOUT_ACCESS_PASSWORD.", { status: 503 });
+  }
+
+  if (!sessionSecret()) {
+    return new NextResponse("Version hébergée sans secret de session : définissez JOBSCOUT_SESSION_SECRET (une longue chaîne aléatoire).", { status: 503 });
   }
 
   const method = req.method.toUpperCase();

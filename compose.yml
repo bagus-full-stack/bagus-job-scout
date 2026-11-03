@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       JOBSCOUT_ACCESS_PASSWORD: ${JOBSCOUT_ACCESS_PASSWORD:?définir JOBSCOUT_ACCESS_PASSWORD dans .env}
-      JOBSCOUT_SESSION_SECRET: ${JOBSCOUT_SESSION_SECRET:-}
+      JOBSCOUT_SESSION_SECRET: ${JOBSCOUT_SESSION_SECRET:?définir JOBSCOUT_SESSION_SECRET dans .env}
     volumes:
       - jobscout-data:/data
     # Pas de port publié : seul Caddy (HTTPS) est joignable de l'extérieur.

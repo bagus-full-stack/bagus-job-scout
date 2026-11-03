@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { xlsxToCandidatures } from "@/lib/excel/io";
-import { createCandidature } from "@/lib/db/candidatures";
+import { importCandidatures } from "@/lib/db/candidatures";
 
 export const runtime = "nodejs";
 
@@ -17,11 +17,6 @@ export async function POST(req: NextRequest) {
   const buf = Buffer.from(await file.arrayBuffer());
   const rows = xlsxToCandidatures(buf);
   if (rows.length > MAX_ROWS) return NextResponse.json({ error: `Trop de lignes (${MAX_ROWS} maximum).` }, { status: 413 });
-  let imported = 0;
-  for (const r of rows) {
-    if (!r.ext_company && !r.ext_title) continue;
-    createCandidature({ offre_id: null, ...r });
-    imported++;
-  }
+  const imported = importCandidatures(rows.filter((r) => r.ext_company || r.ext_title).map((r) => ({ offre_id: null, ...r })));
   return NextResponse.json({ ok: true, imported });
 }

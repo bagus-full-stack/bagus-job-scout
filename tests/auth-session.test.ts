@@ -7,7 +7,7 @@ const env = { ...process.env };
 beforeEach(() => {
   process.env.JOBSCOUT_HOSTED = "1";
   process.env.JOBSCOUT_ACCESS_PASSWORD = "mot-de-passe-de-test";
-  delete process.env.JOBSCOUT_SESSION_SECRET;
+  process.env.JOBSCOUT_SESSION_SECRET = "secret-de-test";
 });
 afterEach(() => {
   process.env = { ...env };
@@ -45,6 +45,13 @@ describe("middleware hébergé", () => {
     delete process.env.JOBSCOUT_ACCESS_PASSWORD;
     expect((await middleware(req("/offres"))).status).toBe(503);
     expect((await middleware(req("/api/health"))).headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("sans secret de session, rien n'est servi (503) : le mot de passe ne signe jamais les sessions", async () => {
+    const token = await createSessionToken();
+    delete process.env.JOBSCOUT_SESSION_SECRET;
+    expect((await middleware(req("/offres"))).status).toBe(503);
+    expect(await verifySessionToken(token)).toBe(false);
   });
 
   it("redirige les pages vers /login et refuse l'API (401) sans session", async () => {

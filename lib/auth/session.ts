@@ -13,9 +13,9 @@ export function accessPassword(): string {
   return process.env.JOBSCOUT_ACCESS_PASSWORD ?? "";
 }
 
-/** Clé de signature des sessions : JOBSCOUT_SESSION_SECRET, à défaut le mot de passe d'accès. */
-function sessionSecret(): string {
-  return process.env.JOBSCOUT_SESSION_SECRET || accessPassword();
+/** Clé de signature des sessions : JOBSCOUT_SESSION_SECRET, jamais le mot de passe (un cookie volé permettrait de le deviner hors ligne). */
+export function sessionSecret(): string {
+  return process.env.JOBSCOUT_SESSION_SECRET ?? "";
 }
 
 const enc = new TextEncoder();
