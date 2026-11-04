@@ -17,6 +17,7 @@ type Quota = {
 
 type ProviderState = {
   keyHint: string | null;
+  extraKeyHints: string[];
   baseURL: string;
   models: { writer: string; reviewer: string };
 };
@@ -56,6 +57,8 @@ export function AiSettings({
   const [provider, setProvider] = useState<ProviderId>("anthropic");
   const [licenseKey, setLicenseKey] = useState("");
   const [apiKey, setApiKey] = useState("");
+  // null = clés supplémentaires inchangées ; texte (une clé par ligne) = remplace la liste ; "" = les retire.
+  const [extraKeys, setExtraKeys] = useState<string | null>(null);
   const [baseURL, setBaseURL] = useState("");
   const [writer, setWriter] = useState("");
   const [reviewer, setReviewer] = useState("");
@@ -73,6 +76,7 @@ export function AiSettings({
     setWriter(saved?.models.writer ?? PROVIDERS[p].models.writer);
     setReviewer(saved?.models.reviewer ?? PROVIDERS[p].models.reviewer);
     setApiKey("");
+    setExtraKeys(null);
     setModels([]);
   }, []);
 
@@ -112,6 +116,7 @@ export function AiSettings({
           provider,
           license_key: licenseKey.trim() || undefined,
           key: apiKey.trim() || undefined,
+          extra_keys: action === "save" && extraKeys !== null ? extraKeys : undefined,
           base_url: preset.editableBaseURL ? baseURL.trim() || undefined : undefined,
           model_writer: writer.trim() || undefined,
           model_reviewer: reviewer.trim() || undefined,
@@ -152,6 +157,7 @@ export function AiSettings({
       } else {
         setLicenseKey("");
         setApiKey("");
+        setExtraKeys(null);
         setInfo(mode === "pack" ? "Relais activé ✓" : `${preset.label} activé ✓`);
       }
       await refresh();
@@ -165,6 +171,7 @@ export function AiSettings({
 
   const configured = !!status?.configured;
   const storedKeyHint = status?.providers?.[provider]?.keyHint ?? null;
+  const extraHints = status?.providers?.[provider]?.extraKeyHints ?? [];
   const canSubmit =
     mode === "pack"
       ? !!licenseKey.trim() || !!status?.licenseHint
@@ -277,6 +284,30 @@ export function AiSettings({
               />
               <span className="block text-caption text-textSecondary mt-1">
                 {storedKeyHint ? <>Clé enregistrée : <code>{storedKeyHint}</code> — laissez vide pour la garder.</> : <>La clé reste sur cette machine.</>}
+              </span>
+            </label>
+          )}
+
+          {preset.keyRequired && mode === "byok" && (
+            <label className="block">
+              <span className="text-caption text-textSecondary">Clés supplémentaires (facultatif)</span>
+              <textarea
+                className="mt-1 min-h-[72px] w-full rounded-md border border-border bg-surface px-3 py-2 font-mono text-small text-text focus:border-accent focus:outline-none focus:ring-[3px] focus:ring-accent/15"
+                value={extraKeys ?? ""}
+                onChange={(e) => setExtraKeys(e.target.value)}
+                placeholder={"Une clé par ligne"}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <span className="block text-caption text-textSecondary mt-1">
+                Quand une clé atteint son quota (erreur 429), l'application passe à la suivante avant de changer de fournisseur.
+                {extraKeys === null && extraHints.length > 0 && (
+                  <>
+                    {" "}Enregistrées : <code>{extraHints.join(", ")}</code> — laissez vide pour les garder.{" "}
+                    <button type="button" className="text-accent hover:underline" onClick={() => setExtraKeys("")}>Les retirer</button>
+                  </>
+                )}
+                {extraKeys === "" && extraHints.length > 0 && " Les clés enregistrées seront retirées à l'enregistrement."}
               </span>
             </label>
           )}

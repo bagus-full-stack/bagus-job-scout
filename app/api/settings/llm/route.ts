@@ -3,6 +3,7 @@ import { getSetting, setSetting } from "@/lib/db";
 import {
   LLM_SETTING_KEYS,
   anthropicBaseUrl,
+  extraKeysSetting,
   getLlmConfig,
   getLlmState,
   packAvailable,
@@ -14,6 +15,7 @@ import {
   proxyBaseUrl,
   readProviderKey,
   resetClaude,
+  saveExtraKeys,
   saveProviderKey,
   type LlmConfig,
 } from "@/lib/ai/client";
@@ -213,7 +215,10 @@ export async function POST(req: NextRequest) {
   if (action === "reset") {
     setSetting(LLM_SETTING_KEYS.mode, "");
     setSetting(LLM_SETTING_KEYS.licenseKey, "");
-    for (const id of PROVIDER_IDS) setSetting(providerKeySetting(id), "");
+    for (const id of PROVIDER_IDS) {
+      setSetting(providerKeySetting(id), "");
+      setSetting(extraKeysSetting(id), "");
+    }
     resetClaude(); // best-effort — l'empreinte relue à chaque appel fait le vrai travail
     return NextResponse.json({ ok: true, ...getLlmState(), quota: null });
   }
@@ -267,9 +272,18 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === "save") {
+    // Clés supplémentaires : absent = inchangées ; texte (une par ligne) = remplace la liste ; texte vide = les retire.
+    let extra: string[] | null = null;
+    if (typeof body.extra_keys === "string") {
+      extra = body.extra_keys.split(/\r?\n/).map((k) => k.trim()).filter(Boolean);
+      if (extra.some((k) => /[^\x21-\x7E]/.test(k))) {
+        return NextResponse.json({ error: "Une clé supplémentaire contient un espace ou un caractère invisible : une clé par ligne, sans rien autour." }, { status: 400 });
+      }
+    }
     setSetting(LLM_SETTING_KEYS.mode, "byok");
     setSetting(LLM_SETTING_KEYS.provider, cfg.provider);
     if (cfg.apiKey) saveProviderKey(cfg.provider, cfg.apiKey);
+    if (extra) saveExtraKeys(cfg.provider, extra);
     if (PROVIDERS[cfg.provider].editableBaseURL) setSetting(providerBaseUrlSetting(cfg.provider), cfg.baseURL);
     setSetting(providerModelsSetting(cfg.provider), JSON.stringify(cfg.models));
     resetClaude(); // best-effort — l'empreinte relue à chaque appel fait le vrai travail

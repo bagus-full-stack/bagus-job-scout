@@ -57,6 +57,22 @@ export const readProviderKey = (p: ProviderId): string | null => {
   return v && decryptSecret(v);
 };
 export const saveProviderKey = (p: ProviderId, key: string): void => setSetting(providerKeySetting(p), encryptSecret(key));
+/** Clés supplémentaires d'un fournisseur (JSON de valeurs chiffrées) : l'appli passe à la suivante quand une clé atteint son quota. */
+export const extraKeysSetting = (p: ProviderId): string => `llm:keys_extra:${p}`;
+export function readExtraKeys(p: ProviderId): string[] {
+  try {
+    const raw = JSON.parse(getSetting(extraKeysSetting(p)) ?? "[]");
+    return Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string").map(decryptSecret).filter((k): k is string => !!k) : [];
+  } catch {
+    return [];
+  }
+}
+/** Remplace la liste (sans doublon ni clé principale). Liste vide : les retire. */
+export function saveExtraKeys(p: ProviderId, keys: string[]): void {
+  const main = readProviderKey(p);
+  const unique = [...new Set(keys.map((k) => k.trim()).filter((k) => k && k !== main))];
+  setSetting(extraKeysSetting(p), unique.length ? JSON.stringify(unique.map(encryptSecret)) : "");
+}
 /** URL de base choisie pour un fournisseur à adresse modifiable (Ollama, LM Studio, Autre). */
 export const providerBaseUrlSetting = (p: ProviderId): string => `llm:base_url:${p}`;
 /** Modèles choisis pour un fournisseur : JSON { writer, reviewer }. */
@@ -178,13 +194,23 @@ export function fallbackOrder(): ProviderId[] {
   }
 }
 
-/** Configurations de secours prêtes à servir derrière `primary` (jamais en mode relais : un seul serveur). */
+/** Une configuration et ses clés supplémentaires : la principale d'abord, puis une configuration par autre clé. */
+const withExtraKeys = (c: LlmConfig): LlmConfig[] => [c, ...readExtraKeys(c.provider).filter((k) => k !== c.apiKey).map((k) => ({ ...c, apiKey: k }))];
+
+/**
+ * Configurations de secours prêtes à servir derrière `primary` (jamais en mode relais : un seul serveur) :
+ * d'abord les autres clés du même fournisseur, puis chaque fournisseur de secours avec ses propres clés.
+ */
 export function fallbackConfigs(primary: LlmConfig): LlmConfig[] {
   if (primary.mode !== "byok") return [];
-  return fallbackOrder()
-    .filter((p) => p !== primary.provider)
-    .map(byokConfigFor)
-    .filter((c): c is LlmConfig => c !== null);
+  return [
+    ...withExtraKeys(primary).slice(1),
+    ...fallbackOrder()
+      .filter((p) => p !== primary.provider)
+      .map(byokConfigFor)
+      .filter((c): c is LlmConfig => c !== null)
+      .flatMap(withExtraKeys),
+  ];
 }
 
 export type LastFallback = { from: ProviderId; to: ProviderId; reason: string; at: string };
@@ -268,6 +294,8 @@ export function getLlmConfig(): LlmConfig {
 /** Réglages d'un fournisseur montrés à l'UI : jamais de clé en clair. */
 export type ProviderState = {
   keyHint: string | null;
+  /** Indices (…XXXX) des clés supplémentaires enregistrées. */
+  extraKeyHints: string[];
   baseURL: string;
   models: { writer: string; reviewer: string };
 };
@@ -295,6 +323,7 @@ export function getLlmState(): LlmState {
   for (const id of Object.keys(PROVIDERS) as ProviderId[]) {
     providers[id] = {
       keyHint: hint(readProviderKey(id)),
+      extraKeyHints: readExtraKeys(id).map((k) => hint(k) ?? "…"),
       baseURL: providerBaseUrl(id),
       models: providerModels(id),
     };

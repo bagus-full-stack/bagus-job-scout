@@ -140,6 +140,8 @@ export const COOLDOWN_MS = 5 * 60_000;
 // Cache partagé entre les copies du module dupliquées par le build standalone (comme le client Anthropic).
 const GL = globalThis as typeof globalThis & { __jobscoutLlmCooldown?: Map<string, number> };
 const cooldowns = () => (GL.__jobscoutLlmCooldown ??= new Map<string, number>());
+/** Écart par fournisseur ET par clé : une clé au quota épuisé ne met pas ses sœurs de côté. */
+const slot = (c: LlmConfig) => `${c.provider}:${c.apiKey ?? ""}`;
 export function resetCooldowns() {
   cooldowns().clear();
 }
@@ -177,7 +179,7 @@ export async function callStructured(
   if (primary.mode === "unset") throw new LlmNotConfiguredError();
   const chain = [primary, ...fallbackConfigs(primary)];
   const now = Date.now();
-  const live = chain.filter((c) => (cooldowns().get(c.provider) ?? 0) <= now);
+  const live = chain.filter((c) => (cooldowns().get(slot(c)) ?? 0) <= now);
   const order = live.length ? live : chain; // tous écartés : on retente tout le monde plutôt que d'échouer d'office
   let reason: string | null = null;
   for (let i = 0; i < order.length; i++) {
@@ -193,7 +195,7 @@ export async function callStructured(
       const why = failoverReason(e);
       if (!why || i === order.length - 1) throw e;
       reason = why;
-      cooldowns().set(c.provider, Date.now() + COOLDOWN_MS);
+      cooldowns().set(slot(c), Date.now() + COOLDOWN_MS);
       console.warn(`[llm] ${c.provider} ${why} — essai du fournisseur suivant`);
     }
   }
