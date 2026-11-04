@@ -180,7 +180,16 @@ export function upcomingDeadlines(limit = 5): UpcomingDeadline[] {
 export const FOLLOW_UP_DAYS = 10;
 
 /** Candidatures envoyées depuis plus de FOLLOW_UP_DAYS jours et toujours sans réponse (calculé, rien n'est stocké). */
-export function followUps(limit = 5): (UpcomingDeadline & { contact: string | null; country: string | null })[] {
+export function followUps(limit = 5) {
+  return statusList(`c.status = 'envoyee' AND julianday(c.applied_at) <= julianday('now', '-${FOLLOW_UP_DAYS} days')`, "ASC", limit);
+}
+
+/** Candidatures en échec (mail revenu en erreur), les plus récentes d'abord. */
+export function failedCandidatures(limit = 5) {
+  return statusList("c.status = 'echec'", "DESC", limit);
+}
+
+function statusList(where: string, order: "ASC" | "DESC", limit: number): (UpcomingDeadline & { contact: string | null; country: string | null })[] {
   ensureOffresRepaired();
   const rows = getDb()
     .prepare(
@@ -189,8 +198,8 @@ export function followUps(limit = 5): (UpcomingDeadline & { contact: string | nu
               COALESCE(NULLIF(TRIM(o.company), ''), NULLIF(TRIM(c.ext_company), '')) AS company
        FROM candidatures c
        LEFT JOIN offres o ON o.id = c.offre_id
-       WHERE c.status = 'envoyee' AND julianday(c.applied_at) <= julianday('now', '-${FOLLOW_UP_DAYS} days')
-       ORDER BY c.applied_at ASC
+       WHERE ${where}
+       ORDER BY c.applied_at ${order}
        LIMIT ?`
     )
     .all(Math.max(1, Math.min(20, Math.trunc(limit)))) as (UpcomingDeadline & { contact: string | null; country: string | null })[];
