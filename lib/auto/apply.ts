@@ -8,6 +8,7 @@ import { buildDocFilename, getDocument, listDocuments, saveDocument } from "@/li
 import { createCandidature, updateCandidature } from "@/lib/db/candidatures";
 import { listSpontaneous, setAutoResult } from "@/lib/db/spontanees";
 import { SPONTANEOUS_SOURCE } from "@/lib/mail/contacts-file";
+import { spontaneousCvPath } from "@/lib/db/spontanee-cv";
 import { findApplyEmail, isEmail } from "@/lib/mail/contact";
 import { mailDraft } from "@/lib/mail/draft";
 import { claimSend, getMailConfig, releaseSend, sendMail } from "@/lib/mail/send";
@@ -93,7 +94,8 @@ async function applyOne(item: AutoItem): Promise<void> {
   // Spontanée : le CV ne dépend que du poste visé et du pays (pas d'annonce à cibler) → on copie celui d'un contact du même
   // poste et pays dans le dossier de celui-ci. Une copie, pas un renvoi : supprimer l'autre contact n'efface pas le CV envoyé.
   let copiedCv = false;
-  if (item.kind === "spontanees" && !pdf("cv")) {
+  // (Un CV importé pour ce poste prime : generate/all le joint tel quel, sans copie d'un autre contact.)
+  if (item.kind === "spontanees" && !pdf("cv") && !spontaneousCvPath(offre.title)) {
     const row = getDb()
       .prepare(
         `SELECT d.id FROM documents d JOIN offres o ON o.id = d.offre_id

@@ -1,4 +1,7 @@
+import fs from "node:fs";
 import { NextRequest, NextResponse } from "next/server";
+import { SPONTANEOUS_SOURCE } from "@/lib/mail/contacts-file";
+import { spontaneousCvPath } from "@/lib/db/spontanee-cv";
 import { getProfile } from "@/lib/db/queries";
 import { getOffre } from "@/lib/db/offres";
 import { generateCV } from "@/lib/ai/generate-cv";
@@ -46,6 +49,12 @@ export async function POST(req: NextRequest) {
     // MAIS aussi ce qui a réussi — plus de document orphelin silencieux.
     const [cvSettled, lmSettled] = await Promise.allSettled([
       (async () => {
+        // Contact spontané dont le poste a un CV importé : il est joint tel quel, rien à générer (pas de Word).
+        const uploadedCv = offre.source === SPONTANEOUS_SOURCE ? spontaneousCvPath(offre.title) : null;
+        if (uploadedCv) {
+          const doc = saveDocument({ type: "cv", offreId: offre.id, format: "pdf", buffer: fs.readFileSync(uploadedCv), meta });
+          return { pdfId: doc.id, docxId: null };
+        }
         const initialCV = await generateCV(profile, offre, lang);
         const { pdf, cv, fontSize } = await fitAndFillCV(initialCV, { profile, offre, lang });
         const docx = wantDocx ? await renderCVDocx(cv, lang, fontSize) : null;

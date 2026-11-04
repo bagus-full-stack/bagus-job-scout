@@ -12,6 +12,8 @@ import { getProfile } from "@/lib/db/queries";
 import { VerifyButton } from "./verify-button";
 import { AiRoleButton } from "./ai-role-button";
 import { AutoPanel } from "@/components/app/auto-panel";
+import { CvPerRole } from "./cv-per-role";
+import { spontaneousCvPath } from "@/lib/db/spontanee-cv";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +58,8 @@ export default async function SpontaneesPage({ searchParams }: { searchParams: P
             <ImportContacts />
           </div>
         } />
+
+      {roles.length > 0 && <CvPerRole roles={roles} uploaded={roles.filter((r) => spontaneousCvPath(r)).map((r) => r.trim().toLowerCase())} />}
 
       {all.length === 0 ? (
         <div className="glass-panel px-6 py-16 text-center">
