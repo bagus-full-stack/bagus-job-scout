@@ -3,7 +3,8 @@ import { ArrowRight, ArrowUpRight, Briefcase, CalendarClock, CalendarDays, Clock
 import { ScoreOrbit } from "@/components/app/score-orbit";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { suggestedOffres, offresCounts } from "@/lib/db/offres";
-import { listCandidatures, candidaturesCounts, upcomingDeadlines, followUps, failedCandidatures, FOLLOW_UP_DAYS } from "@/lib/db/candidatures";
+import { listCandidatures, candidaturesCounts, upcomingDeadlines, followUps, failedCandidatures, autoSendFailures, FOLLOW_UP_DAYS } from "@/lib/db/candidatures";
+import { SPONTANEOUS_SOURCE } from "@/lib/mail/contacts-file";
 import { listDocuments } from "@/lib/db/documents";
 import { highScoreFigure, untrackedOffresCount, vieFigure } from "@/lib/db/dashboard";
 import { getProfile } from "@/lib/db/queries";
@@ -40,6 +41,7 @@ export default async function DashboardPage() {
   const deadlines = upcomingDeadlines(5);
   const toFollow = followUps(5);
   const failed = failedCandidatures(5);
+  const sendFailures = autoSendFailures(5);
   const documents = listDocuments();
   const untrackedCount = untrackedOffresCount();
   // D4 : carte V.I.E pour un profil qui en cherche (contrats recherchés : preferred_contracts
@@ -209,12 +211,12 @@ export default async function DashboardPage() {
             </section>
           )}
 
-          {failed.length > 0 && (
+          {(failed.length > 0 || sendFailures.length > 0) && (
             <section aria-labelledby="failed-title" className="glass-panel overflow-hidden">
               <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-5">
                 <div>
                   <h2 id="failed-title" className="font-display text-[19px] font-medium">En échec</h2>
-                  <p className="mt-0.5 text-caption text-textSecondary">Mail revenu en erreur : adresse à corriger</p>
+                  <p className="mt-0.5 text-caption text-textSecondary">Envoi refusé ou mail revenu en erreur</p>
                 </div>
                 <Link href="/candidatures" className="inline-flex items-center gap-1 text-caption font-medium text-textSecondary hover:text-accent">Le suivi <ArrowUpRight className="h-3.5 w-3.5" /></Link>
               </div>
@@ -223,6 +225,12 @@ export default async function DashboardPage() {
                   <li key={d.id} className="min-w-0">
                     <span className="block line-clamp-2 text-small font-semibold leading-snug">{d.title ?? "Poste non précisé"}</span>
                     <span className="block truncate text-small text-textSecondary">{d.company ?? "Entreprise non précisée"}{d.contact ? ` · ${d.contact}` : ""} · envoyée le {displayDate(d.deadline)}</span>
+                  </li>
+                ))}
+                {sendFailures.map((f) => (
+                  <li key={`auto-${f.id}`} className="min-w-0">
+                    <Link href={f.source === SPONTANEOUS_SOURCE ? "/spontanees" : `/offres/${f.id}`} className="block line-clamp-2 text-small font-semibold leading-snug hover:text-accent">{f.title || "Poste non précisé"}</Link>
+                    <span className="block truncate text-small text-textSecondary" title={f.error}>{f.company || "Entreprise non précisée"} · {f.error}</span>
                   </li>
                 ))}
               </ul>

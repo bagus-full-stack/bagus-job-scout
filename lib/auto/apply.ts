@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
 import { getOffre } from "@/lib/db/offres";
 import { getProfile } from "@/lib/db/queries";
-import { buildDocFilename, getDocument, listDocuments } from "@/lib/db/documents";
+import { buildDocFilename, getDocument, listDocuments, saveDocument } from "@/lib/db/documents";
 import { createCandidature, updateCandidature } from "@/lib/db/candidatures";
 import { listSpontaneous, setAutoResult } from "@/lib/db/spontanees";
 import { SPONTANEOUS_SOURCE } from "@/lib/mail/contacts-file";
@@ -90,36 +90,38 @@ async function applyOne(item: AutoItem): Promise<void> {
 
   const have = () => listDocuments({ offreId: item.id });
   const pdf = (type: string) => have().find((d) => d.type === type && d.format === "pdf");
-  // Spontanée : le CV ne dépend que du poste visé (pas d'annonce à cibler) → un CV par poste, réutilisé par tous les contacts.
-  const sharedCv =
-    item.kind === "spontanees" && !pdf("cv")
-      ? (() => {
-          const row = getDb()
-            .prepare(
-              `SELECT d.id FROM documents d JOIN offres o ON o.id = d.offre_id
-               WHERE d.type = 'cv' AND d.format = 'pdf' AND o.source = ? AND o.title = ? AND o.id <> ?
-               ORDER BY d.generated_at DESC LIMIT 1`
-            )
-            .get(SPONTANEOUS_SOURCE, offre.title, item.id) as { id: number } | undefined;
-          const doc = row && getDocument(row.id);
-          return doc && fs.existsSync(doc.file_path) ? doc : null;
-        })()
-      : null;
-  if (!sharedCv && (!pdf("cv") || !pdf("lm"))) {
+  // Spontanée : le CV ne dépend que du poste visé et du pays (pas d'annonce à cibler) → on copie celui d'un contact du même
+  // poste et pays dans le dossier de celui-ci. Une copie, pas un renvoi : supprimer l'autre contact n'efface pas le CV envoyé.
+  let copiedCv = false;
+  if (item.kind === "spontanees" && !pdf("cv")) {
+    const row = getDb()
+      .prepare(
+        `SELECT d.id FROM documents d JOIN offres o ON o.id = d.offre_id
+         WHERE d.type = 'cv' AND d.format = 'pdf' AND o.source = ? AND o.title = ? AND o.country IS ? AND o.id <> ?
+         ORDER BY d.generated_at DESC LIMIT 1`
+      )
+      .get(SPONTANEOUS_SOURCE, offre.title, offre.country ?? null, item.id) as { id: number } | undefined;
+    const doc = row && getDocument(row.id);
+    if (doc && fs.existsSync(doc.file_path)) {
+      saveDocument({ type: "cv", offreId: item.id, format: "pdf", buffer: fs.readFileSync(doc.file_path), meta: { company: offre.company, title: offre.title } });
+      copiedCv = true;
+    }
+  }
+  if (!copiedCv && (!pdf("cv") || !pdf("lm"))) {
     // Import tardif : la génération PDF (JSX) n'est chargée qu'au moment d'en avoir besoin.
     const { POST: generateAll } = await import("@/app/api/generate/all/route");
     const res = await generateAll(
       new NextRequest("http://localhost/api/generate/all", { method: "POST", body: JSON.stringify({ offreId: item.id }), headers: { "content-type": "application/json" } })
     );
     if (!res.ok) throw new Error(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? `Génération impossible (HTTP ${res.status}).`);
-  } else if (sharedCv && !pdf("lm")) {
+  } else if (copiedCv && !pdf("lm")) {
     const { POST: generateLm } = await import("@/app/api/generate/lm/route");
     const res = await generateLm(
       new NextRequest("http://localhost/api/generate/lm", { method: "POST", body: JSON.stringify({ offreId: item.id }), headers: { "content-type": "application/json" } })
     );
     if (!res.ok) throw new Error(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? `Génération impossible (HTTP ${res.status}).`);
   }
-  const cv = pdf("cv") ?? sharedCv ?? undefined;
+  const cv = pdf("cv");
   const lm = pdf("lm");
   if (!cv || !lm) throw new Error("CV ou lettre manquant après la génération.");
   if (![cv, lm].every((d) => fs.existsSync(d.file_path))) throw new Error("Un document est introuvable sur le disque.");

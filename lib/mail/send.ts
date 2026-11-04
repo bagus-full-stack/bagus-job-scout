@@ -21,7 +21,13 @@ function secretKey(): Buffer {
   } catch {
     const key = randomBytes(32);
     ensureDir(path.dirname(file));
-    fs.writeFileSync(file, key.toString("base64"), { mode: 0o600, flag: "wx" });
+    try {
+      fs.writeFileSync(file, key.toString("base64"), { mode: 0o600, flag: "wx" });
+    } catch (e) {
+      // Un appel simultané vient de créer la clé : c'est la sienne qui fait foi, la nôtre n'a rien chiffré.
+      if ((e as NodeJS.ErrnoException).code === "EEXIST") return Buffer.from(fs.readFileSync(file, "utf8").trim(), "base64");
+      throw e;
+    }
     return key;
   }
 }

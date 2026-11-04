@@ -189,6 +189,21 @@ export function failedCandidatures(limit = 5) {
   return statusList("c.status = 'echec'", "DESC", limit);
 }
 
+export type AutoSendFailure = { id: number; source: string; company: string; title: string; error: string };
+
+/** Cibles de l'envoi automatique (contact spontané ou offre) en échec et sans candidature enregistrée, les plus récentes d'abord. */
+export function autoSendFailures(limit = 5): AutoSendFailure[] {
+  return getDb()
+    .prepare(
+      `SELECT o.id, o.source, o.company, o.title, json_extract(o.raw_payload, '$.auto_error') AS error FROM offres o
+       WHERE json_valid(o.raw_payload) AND json_extract(o.raw_payload, '$.auto_error') IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM candidatures c WHERE c.offre_id = o.id)
+       ORDER BY o.id DESC LIMIT ?`
+    )
+    .all(Math.max(1, Math.min(20, Math.trunc(limit))))
+    .map((r) => ({ ...(r as AutoSendFailure) }));
+}
+
 function statusList(where: string, order: "ASC" | "DESC", limit: number): (UpcomingDeadline & { contact: string | null; country: string | null })[] {
   ensureOffresRepaired();
   const rows = getDb()
