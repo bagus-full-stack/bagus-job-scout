@@ -157,6 +157,7 @@ Coût : avec Claude (Anthropic), environ 0,12 à 0,20 $ par dossier (CV + lettre
   - Garde-fous : pause de 45 à 120 s entre deux envois, bouton « Arrêter », arrêt après 3 échecs de suite ou si la messagerie refuse l'identifiant, jamais deux candidatures pour la même cible, un seul lot à la fois.
   - Un mail déjà parti n'est jamais renvoyé : si la candidature n'a pas pu être enregistrée après l'envoi, le lot s'arrête, la cible est marquée « Mail envoyé, mais candidature non enregistrée » et n'est plus proposée (ajoutez la candidature à la main).
   - Bouton **Réessayer** par contact en échec (page *Spontanées*) : relance l'envoi pour ce seul contact, après confirmation. Absent si le mail est déjà parti ou si l'adresse est en « Échec » (retour de la messagerie).
+- **CV par poste visé** : en envoi automatique, le CV d'un contact spontané est généré une seule fois par intitulé de poste puis réutilisé par les contacts du même poste ; seule la lettre est générée pour chacun (`lib/auto/apply.ts`).
 - **Corps du mail spontané** : il présente le candidat (deux premières phrases du résumé du profil), le poste et les contrats recherchés, puis ville et lien du portfolio du profil en signature (`lib/mail/draft.ts`) ; les lignes dont le profil n'a pas la donnée sont omises. Dans la lettre de motivation, le bloc entreprise est aligné à droite.
 - **Poste visé par contact** : saisi à la main, ou choisi par l'IA d'après l'adresse et le nom de l'entreprise (`lib/ai/choose-role.ts`) ; le CV est généré pour ce poste.
 
