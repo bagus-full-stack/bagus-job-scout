@@ -2,6 +2,7 @@ import "server-only";
 import type { Browser, BrowserContext } from "playwright";
 import {
   applyBrowsersPath,
+  findShellExecutable,
   isEngineInstalled,
   ENGINE_MISSING_MESSAGE,
 } from "./browser-engine";
@@ -63,7 +64,7 @@ export async function getBrowser(): Promise<Browser> {
   applyBrowsersPath();
   if (!isEngineInstalled()) throw new Error(ENGINE_MISSING_MESSAGE);
   const { chromium } = await import("playwright");
-  _browser = await chromium.launch({ headless: true });
+  _browser = await chromium.launch({ headless: true, executablePath: findShellExecutable() ?? undefined });
   return _browser;
 }
 

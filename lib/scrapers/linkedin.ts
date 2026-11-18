@@ -230,6 +230,9 @@ async function fetchDetail(page: any, card: ListingCard): Promise<ScrapedOffre> 
   while (attempt < 3) {
     try {
       await page.goto(guestUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+      // LinkedIn redirige parfois après le goto : évaluer pendant la navigation détruit
+      // le contexte (« Execution context was destroyed »). On attend qu'elle se termine.
+      await page.waitForLoadState("load", { timeout: 15000 }).catch(() => {});
       await page.waitForTimeout(400);
 
       const data = await page.evaluate(() => {

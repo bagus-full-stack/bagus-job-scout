@@ -44,7 +44,23 @@ function defaultRegistryDir(): string {
   return path.join(envPath("XDG_CACHE_HOME") || homePath(".cache"), "ms-playwright");
 }
 
-function hasCompleteChromium(dir: string): boolean {
+/** Révision du headless shell exigée par le Playwright installé (null si illisible). */
+function requiredShellRevision(): string | null {
+  try {
+    const f = path.join(process.cwd(), "node_modules", "playwright-core", "browsers.json");
+    const list = JSON.parse(fs.readFileSync(f, "utf-8")).browsers as { name: string; revision: string }[];
+    return list.find((b) => b.name === "chromium-headless-shell")?.revision ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `dir` contient-il le moteur exigé par ce Playwright ? Une autre révision (ex. 1248 dans
+ * le registre global alors que 1217 est requise) ne compte pas : le lancement échouerait.
+ * shortcut: sans browsers.json lisible, n'importe quel chromium* complet est accepté.
+ */
+export function hasCompleteChromium(dir: string, rev: string | null = requiredShellRevision()): boolean {
   let entries: string[];
   try {
     entries = fs.readdirSync(dir);
@@ -52,7 +68,9 @@ function hasCompleteChromium(dir: string): boolean {
     return false;
   }
   return entries.some(
-    (name) => name.startsWith("chromium") && fs.existsSync(path.join(dir, name, "INSTALLATION_COMPLETE"))
+    (name) =>
+      (rev ? name === `chromium_headless_shell-${rev}` : name.startsWith("chromium")) &&
+      fs.existsSync(path.join(dir, name, "INSTALLATION_COMPLETE"))
   );
 }
 
@@ -69,6 +87,25 @@ export function resolveBrowsersDir(): string {
   const def = defaultRegistryDir();
   if (hasCompleteChromium(def)) return def;
   return app;
+}
+
+/**
+ * Exécutable du headless shell dans le dossier résolu. Passé tel quel à `launch` : le
+ * registre de playwright-core est figé au premier require, et s'il a été chargé avant
+ * applyBrowsersPath il pointe sur ms-playwright (« Executable doesn't exist »).
+ */
+export function findShellExecutable(dir = resolveBrowsersDir()): string | null {
+  const rev = requiredShellRevision();
+  const exe = process.platform === "win32" ? "chrome-headless-shell.exe" : "chrome-headless-shell";
+  try {
+    for (const name of fs.readdirSync(dir)) {
+      if (!name.startsWith("chromium_headless_shell-") || (rev && name !== `chromium_headless_shell-${rev}`)) continue;
+      const sub = fs.readdirSync(path.join(dir, name)).find((d) => d.startsWith("chrome-headless-shell"));
+      const p = sub && path.join(dir, name, sub, exe);
+      if (p && fs.existsSync(p)) return p;
+    }
+  } catch {}
+  return null;
 }
 
 /** Chemin du CLI playwright, résolu sans dépendre du bundler. */
